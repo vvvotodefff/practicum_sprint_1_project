@@ -62,8 +62,8 @@ namespace ProjectWork.Controllers
         /// <param name="id"></param>
         /// <param name="eventItem"></param>
         /// <returns></returns>
-        /// <responce code="204">Успешно обновляет событие с указанным ID</responce>
-        /// <responce code ="404">Событие с указанным ID не найдено</responce>
+        /// <response code="204">Успешно обновляет событие с указанным ID</response>
+        /// <response code ="404">Событие с указанным ID не найдено</response>
         [HttpPut("{id:guid}")]
         public IActionResult UpdateEvent(Guid id, Event eventItem)
         {
@@ -77,8 +77,8 @@ namespace ProjectWork.Controllers
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
-        /// <responce code="204">Успешно удаляет событие с указанным ID</responce>
-        /// <responce code="404">Событие с указанным ID не найдено</responce>
+        /// <response code="204">Успешно удаляет событие с указанным ID</response>
+        /// <response code="404">Событие с указанным ID не найдено</response>
         [HttpDelete("{id:guid}")]
         public IActionResult DeleteEvent(Guid id)
         {
