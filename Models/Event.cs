@@ -6,7 +6,7 @@ public class Event : IValidatableObject
 {
     public Guid Id { get; set; }
 
-    [Required(ErrorMessage = "Название обязательно")]
+    [Required(ErrorMessage = "Название обязательно для заполнения")]
     public required string Title { get; set; }
 
     public string? Description { get; set; }
