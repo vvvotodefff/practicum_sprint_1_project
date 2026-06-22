@@ -19,12 +19,12 @@ public class Event : IValidatableObject
     {
         if (StartAt == default)
         {
-            yield return new ValidationResult("Время начала обязательно к заполнения", [nameof(StartAt)]);
+            yield return new ValidationResult("Время начала обязательно к заполнению", [nameof(StartAt)]);
         }
 
         if (EndAt == default)
         {
-            yield return new ValidationResult("Время окончания обязательно к заполнения", [nameof(EndAt)]);
+            yield return new ValidationResult("Время окончания обязательно к заполнению", [nameof(EndAt)]);
         }
 
         if (StartAt != default &&

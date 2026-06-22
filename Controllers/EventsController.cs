@@ -21,6 +21,7 @@ namespace ProjectWork.Controllers
         /// <returns></returns>
         /// <response code="200">Успешно возвращает список событий</response>
         [HttpGet]
+        [ProducesResponseType(typeof(Event), StatusCodes.Status200OK)]
         public ActionResult<IEnumerable<Event>> GetEvents()
         {
             return Ok(_eventService.GetEvents());
@@ -32,13 +33,16 @@ namespace ProjectWork.Controllers
         /// <param name="id"></param>
         /// <returns></returns>
         /// <response code="200">Успешно возвращает событие с указанным ID</response>
+        /// <response code="404">Событие с указанным ID не найдено</response>
         [HttpGet("{id:guid}")]
+        [ProducesResponseType(typeof(Event), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
         public ActionResult<Event> GetEventById(Guid id)
         {
             var eventItem = _eventService.GetEventById(id);
 
             if (eventItem is null)
-                return NotFound();
+                return EventNotFound(id);
 
             return Ok(eventItem);
         }
@@ -50,6 +54,7 @@ namespace ProjectWork.Controllers
         /// <returns></returns>
         /// <response code="201">Успешно создает новое событие и возвращает его с сгенерированным ID</response>
         [HttpPost]
+        [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
         public ActionResult<Event> CreateEvent(Event eventItem)
         {
             _eventService.AddEvent(eventItem);
@@ -65,10 +70,14 @@ namespace ProjectWork.Controllers
         /// <response code="204">Успешно обновляет событие с указанным ID</response>
         /// <response code ="404">Событие с указанным ID не найдено</response>
         [HttpPut("{id:guid}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
         public IActionResult UpdateEvent(Guid id, Event eventItem)
         {
             if (!_eventService.UpdateEvent(id, eventItem))
-                return NotFound();
+                return EventNotFound(id);
+
             return NoContent();
         }
 
@@ -80,11 +89,22 @@ namespace ProjectWork.Controllers
         /// <response code="204">Успешно удаляет событие с указанным ID</response>
         /// <response code="404">Событие с указанным ID не найдено</response>
         [HttpDelete("{id:guid}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
         public IActionResult DeleteEvent(Guid id)
         {
             if (!_eventService.DeleteEvent(id))
-                return NotFound();
+                return EventNotFound(id);
+
             return NoContent();
+        }
+
+        private ObjectResult EventNotFound(Guid id)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Событие не найдено",
+                detail: $"Событие с идентификатором '{id}' не найдено.");
         }
 
     }
