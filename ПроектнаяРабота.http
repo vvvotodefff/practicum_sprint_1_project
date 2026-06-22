@@ -1,6 +1,0 @@
-@ПроектнаяРабота_HostAddress = http://localhost:5259
-
-GET {{ПроектнаяРабота_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
