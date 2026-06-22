@@ -22,6 +22,7 @@ namespace ProjectWork.Controllers
         /// <response code="200">Успешно возвращает список событий</response>
         [HttpGet]
         [ProducesResponseType(typeof(Event), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(IEnumerable<Event>), StatusCodes.Status200OK)]
         public ActionResult<IEnumerable<Event>> GetEvents()
         {
             return Ok(_eventService.GetEvents());
@@ -54,6 +55,7 @@ namespace ProjectWork.Controllers
         /// <returns></returns>
         /// <response code="201">Успешно создает новое событие и возвращает его с сгенерированным ID</response>
         [HttpPost]
+        [ProducesResponseType(typeof(Event), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
         public ActionResult<Event> CreateEvent(Event eventItem)
         {
