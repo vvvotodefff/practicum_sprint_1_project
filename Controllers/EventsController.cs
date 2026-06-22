@@ -15,12 +15,23 @@ namespace ProjectWork.Controllers
             _eventService = eventService;
         }
 
+        /// <summary>
+        /// Получить список всех событий
+        /// </summary>
+        /// <returns></returns>
+        /// <response code="200">Успешно возвращает список событий</response>
         [HttpGet]
         public ActionResult<IEnumerable<Event>> GetEvents()
         {
             return Ok(_eventService.GetEvents());
         }
 
+        /// <summary>
+        /// Получить событие по его уникальному идентификатору ID
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        /// <response code="200">Успешно возвращает событие с указанным ID</response>
         [HttpGet("{id:guid}")]
         public ActionResult<Event> GetEventById(Guid id)
         {
@@ -32,6 +43,12 @@ namespace ProjectWork.Controllers
             return Ok(eventItem);
         }
 
+        /// <summary>
+        /// Создать новое событие. ID события будет сгенерирован автоматически при сохранении в базе данных
+        /// </summary>
+        /// <param name="eventItem"></param>
+        /// <returns></returns>
+        /// <response code="201">Успешно создает новое событие и возвращает его с сгенерированным ID</response>
         [HttpPost]
         public ActionResult<Event> CreateEvent(Event eventItem)
         {
@@ -39,7 +56,14 @@ namespace ProjectWork.Controllers
             return CreatedAtAction(nameof(GetEventById), new { id = eventItem.Id }, eventItem);
         }
 
-
+        /// <summary>
+        /// Обновить существующее событие по его уникальному идентификатору ID.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="eventItem"></param>
+        /// <returns></returns>
+        /// <responce code="204">Успешно обновляет событие с указанным ID</responce>
+        /// <responce code ="404">Событие с указанным ID не найдено</responce>
         [HttpPut("{id:guid}")]
         public IActionResult UpdateEvent(Guid id, Event eventItem)
         {
@@ -48,6 +72,13 @@ namespace ProjectWork.Controllers
             return NoContent();
         }
 
+        /// <summary>
+        /// Удалить событие по его уникальному идентификатору ID
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        /// <responce code="204">Успешно удаляет событие с указанным ID</responce>
+        /// <responce code="404">Событие с указанным ID не найдено</responce>
         [HttpDelete("{id:guid}")]
         public IActionResult DeleteEvent(Guid id)
         {
