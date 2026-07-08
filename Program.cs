@@ -1,25 +1,26 @@
 using ProjectWork.Services;
-using ProjectWork.Models;
-using ProjectWork.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-
+builder.Services.AddProblemDetails();
+builder.Services.AddSwaggerGen(options =>
+{
+    var xmlFilename = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
+    options.IncludeXmlComments(xmlPath);
+});
 builder.Services.AddScoped<IEventService, EventService>();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
+app.UseExceptionHandler();
+app.UseStatusCodePages();
 
+app.UseSwagger();
+app.UseSwaggerUI();
 app.UseHttpsRedirection();
 
 app.UseAuthorization();

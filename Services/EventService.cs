@@ -20,9 +20,7 @@ public class EventService : IEventService
 
     public void AddEvent(Event eventItem)
     {
-        if (eventItem.Id == Guid.Empty)
-            eventItem.Id = Guid.NewGuid();
-
+        eventItem.Id = Guid.NewGuid();
         Events.Add(eventItem);
     }
 

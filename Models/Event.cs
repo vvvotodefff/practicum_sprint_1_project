@@ -1,9 +1,12 @@
-﻿namespace ProjectWork.Models;
+﻿using System.ComponentModel.DataAnnotations;
 
-public class Event
+namespace ProjectWork.Models;
+
+public class Event : IValidatableObject
 {
     public Guid Id { get; set; }
 
+    [Required(ErrorMessage = "Название обязательно для заполнения")]
     public required string Title { get; set; }
 
     public string? Description { get; set; }
@@ -12,5 +15,25 @@ public class Event
 
     public DateTime EndAt { get; set; }
 
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (StartAt == default)
+        {
+            yield return new ValidationResult("Время начала обязательно к заполнению", [nameof(StartAt)]);
+        }
+
+        if (EndAt == default)
+        {
+            yield return new ValidationResult("Время окончания обязательно к заполнению", [nameof(EndAt)]);
+        }
+
+        if (StartAt != default &&
+            EndAt != default &&
+            EndAt <= StartAt)
+        {
+            yield return new ValidationResult("Время окончания должно быть позже времени начала", [nameof(EndAt)]);
+        }
+
+    }
 }
 
