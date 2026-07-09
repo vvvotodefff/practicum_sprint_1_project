@@ -1,4 +1,5 @@
 ﻿
+using System.Collections;
 using ProjectWork.Models;
 using ProjectWork.Services;
 
@@ -8,9 +9,26 @@ public class EventService : IEventService
 {
     private static readonly List<Event> Events = [];
 
-    public List<Event> GetEvents()
+    public List<Event> GetEvents(string? title, DateTime? from, DateTime? to)
     {
-        return Events;
+        IEnumerable<Event> filteredEvents = Events;
+
+        if (title != null) 
+        {
+            filteredEvents = filteredEvents.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (from != null)
+        {
+            filteredEvents = filteredEvents.Where(e => e.StartAt >= from);
+        }
+
+        if (to != null) 
+        {
+            filteredEvents = filteredEvents.Where(e => e.EndAt <= to);
+        }
+
+        return filteredEvents.ToList();
     }
 
     public Event? GetEventById(Guid id)

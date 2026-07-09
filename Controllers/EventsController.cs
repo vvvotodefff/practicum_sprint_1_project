@@ -24,9 +24,9 @@ namespace ProjectWork.Controllers
         [HttpGet]
         [ProducesResponseType(typeof(Event), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(IEnumerable<Event>), StatusCodes.Status200OK)]
-        public ActionResult<IEnumerable<Event>> GetEvents()
+        public ActionResult<IEnumerable<Event>> GetEvents([FromQuery] string? title, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
         {
-            return Ok(_eventService.GetEvents());
+            return Ok(_eventService.GetEvents(title,from,to));
         }
 
         /// <summary>

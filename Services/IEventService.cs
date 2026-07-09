@@ -1,10 +1,11 @@
-﻿using ProjectWork.Models;
+﻿using System;
+using ProjectWork.Models;
 
 namespace ProjectWork.Services;
 
 public interface IEventService
 {
-    List<Event> GetEvents();
+    List<Event> GetEvents(string? title, DateTime? from, DateTime? to);
     Event? GetEventById(Guid id);
     void AddEvent(Event eventItem);
     bool UpdateEvent(Guid id, Event eventItem);
