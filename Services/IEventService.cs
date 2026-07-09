@@ -5,7 +5,7 @@ namespace ProjectWork.Services;
 
 public interface IEventService
 {
-    List<Event> GetEvents(string? title, DateTime? from, DateTime? to);
+    PaginatedResult<Event> GetEvents(string? title, DateTime? from, DateTime? to, int page, int pageSize);
     Event? GetEventById(Guid id);
     void AddEvent(Event eventItem);
     bool UpdateEvent(Guid id, Event eventItem);
