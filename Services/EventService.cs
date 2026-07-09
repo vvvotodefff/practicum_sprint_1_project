@@ -10,7 +10,7 @@ public class EventService : IEventService
     {
         IEnumerable<Event> filteredEvents = Events;
 
-        if (title != null)
+        if (!string.IsNullOrWhiteSpace(title))
         {
             filteredEvents = filteredEvents.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
         }

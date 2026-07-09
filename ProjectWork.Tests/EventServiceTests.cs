@@ -212,4 +212,92 @@ public class EventServiceTests
         Assert.False(deleted);
         Assert.Single(GetAll().Items);
     }
+
+    // ----- Граничные случаи (edge cases) -----
+
+    [Fact]
+    public void GetEvents_EmptyStorage_ReturnsEmptyResult()
+    {
+        var result = GetAll();
+
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void GetEvents_EmptyOrWhitespaceTitle_IgnoresFilter(string title)
+    {
+        AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
+        AddEvent("Отпуск", new DateTime(2026, 8, 1, 0, 0, 0), new DateTime(2026, 8, 15, 0, 0, 0));
+
+        var result = _service.GetEvents(title, null, null, 1, 100);
+
+        Assert.Equal(2, result.TotalCount);
+    }
+
+    [Fact]
+    public void GetEvents_TitleWithoutMatches_ReturnsEmptyResult()
+    {
+        AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
+
+        var result = _service.GetEvents("абракадабра", null, null, 1, 100);
+
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public void GetEvents_EventExactlyMatchingFromAndTo_IsIncluded()
+    {
+        var startAt = new DateTime(2026, 7, 10, 9, 0, 0);
+        var endAt = new DateTime(2026, 7, 10, 10, 0, 0);
+        AddEvent("Граничное", startAt, endAt);
+
+        // Границы диапазона совпадают с датами события — сравнение нестрогое
+        var result = _service.GetEvents(null, startAt, endAt, 1, 100);
+
+        var found = Assert.Single(result.Items);
+        Assert.Equal("Граничное", found.Title);
+    }
+
+    [Fact]
+    public void GetEvents_FromGreaterThanTo_ReturnsEmptyResult()
+    {
+        AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
+
+        var result = _service.GetEvents(null, new DateTime(2026, 8, 1, 0, 0, 0), new DateTime(2026, 7, 1, 0, 0, 0), 1, 100);
+
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public void GetEvents_LastPage_ReturnsOnlyRemainingItems()
+    {
+        for (var day = 1; day <= 12; day++)
+        {
+            AddEvent($"Событие {day:00}", new DateTime(2026, 7, day, 9, 0, 0), new DateTime(2026, 7, day, 10, 0, 0));
+        }
+
+        var result = _service.GetEvents(null, null, null, 3, 5);
+
+        Assert.Equal(12, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal("Событие 11", result.Items.First().Title);
+        Assert.Equal("Событие 12", result.Items.Last().Title);
+    }
+
+    [Fact]
+    public void GetEvents_PageSizeLargerThanTotal_ReturnsAllItems()
+    {
+        AddEvent("Первое", new DateTime(2026, 7, 1, 9, 0, 0), new DateTime(2026, 7, 1, 10, 0, 0));
+        AddEvent("Второе", new DateTime(2026, 7, 2, 9, 0, 0), new DateTime(2026, 7, 2, 10, 0, 0));
+
+        var result = _service.GetEvents(null, null, null, 1, 100);
+
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.Items.Count);
+    }
 }
