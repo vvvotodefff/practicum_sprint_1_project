@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using ProjectWork.Services;
 using ProjectWork.Models;
+using ProjectWork.Exceptions;
 
 namespace ProjectWork.Controllers
 {
@@ -43,7 +44,7 @@ namespace ProjectWork.Controllers
             var eventItem = _eventService.GetEventById(id);
 
             if (eventItem is null)
-                return EventNotFound(id);
+                throw new NotFoundException($"Событие с идентификатором '{id}' не найдено.");
 
             return Ok(eventItem);
         }
@@ -78,7 +79,7 @@ namespace ProjectWork.Controllers
         public IActionResult UpdateEvent(Guid id, Event eventItem)
         {
             if (!_eventService.UpdateEvent(id, eventItem))
-                return EventNotFound(id);
+                throw new NotFoundException($"Событие с идентификатором '{id}' не найдено.");
 
             return NoContent();
         }
@@ -96,18 +97,9 @@ namespace ProjectWork.Controllers
         public IActionResult DeleteEvent(Guid id)
         {
             if (!_eventService.DeleteEvent(id))
-                return EventNotFound(id);
+                throw new NotFoundException($"Событие с идентификатором '{id}' не найдено.");
 
             return NoContent();
         }
-
-        private ObjectResult EventNotFound(Guid id)
-        {
-            return Problem(
-                statusCode: StatusCodes.Status404NotFound,
-                title: "Событие не найдено",
-                detail: $"Событие с идентификатором '{id}' не найдено.");
-        }
-
     }
 }

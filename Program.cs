@@ -1,7 +1,7 @@
 using ProjectWork.Services;
+using ProjectWork.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
-
 
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
@@ -17,7 +17,7 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-app.UseExceptionHandler();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseStatusCodePages();
 
 app.UseSwagger();
