@@ -4,7 +4,7 @@ namespace ProjectWork.Services;
 
 public class EventService : IEventService
 {
-    private static readonly List<Event> Events = [];
+    private readonly List<Event> Events = [];
 
     public PaginatedResult<Event> GetEvents(string? title, DateTime? from, DateTime? to, int page, int pageSize)
     {

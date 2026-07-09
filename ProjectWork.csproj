@@ -12,4 +12,12 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.2" />
   </ItemGroup>
 
+  <!-- Тестовый проект лежит в подпапке — исключаем его файлы из основного проекта -->
+  <ItemGroup>
+    <Compile Remove="ProjectWork.Tests\**" />
+    <Content Remove="ProjectWork.Tests\**" />
+    <None Remove="ProjectWork.Tests\**" />
+    <EmbeddedResource Remove="ProjectWork.Tests\**" />
+  </ItemGroup>
+
 </Project>
