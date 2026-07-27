@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc;
 using ProjectWork.Services;
 using ProjectWork.Models;
+using ProjectWork.Exceptions;
 
 namespace ProjectWork.Controllers
 {
@@ -16,16 +18,27 @@ namespace ProjectWork.Controllers
         }
 
         /// <summary>
-        /// Получить список всех событий
+        /// Получить список событий с возможностью фильтрации по названию и датам, постранично
         /// </summary>
+        /// <param name="title">Поиск по названию: без учёта регистра, частичное совпадение</param>
+        /// <param name="from">События, которые начинаются не раньше указанной даты</param>
+        /// <param name="to">События, которые заканчиваются не позже указанной даты</param>
+        /// <param name="page">Номер страницы, начиная с 1</param>
+        /// <param name="pageSize">Количество элементов на странице</param>
         /// <returns></returns>
-        /// <response code="200">Успешно возвращает список событий</response>
+        /// <response code="200">Успешно возвращает страницу списка событий</response>
+        /// <response code="400">Некорректные параметры пагинации</response>
         [HttpGet]
-        [ProducesResponseType(typeof(Event), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(IEnumerable<Event>), StatusCodes.Status200OK)]
-        public ActionResult<IEnumerable<Event>> GetEvents()
+        [ProducesResponseType(typeof(PaginatedResult<Event>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+        public ActionResult<PaginatedResult<Event>> GetEvents(
+            [FromQuery] string? title,
+            [FromQuery] DateTime? from,
+            [FromQuery] DateTime? to,
+            [FromQuery][Range(1, int.MaxValue)] int page = 1,
+            [FromQuery][Range(1, int.MaxValue)] int pageSize = 10)
         {
-            return Ok(_eventService.GetEvents());
+            return Ok(_eventService.GetEvents(title, from, to, page, pageSize));
         }
 
         /// <summary>
@@ -43,7 +56,7 @@ namespace ProjectWork.Controllers
             var eventItem = _eventService.GetEventById(id);
 
             if (eventItem is null)
-                return EventNotFound(id);
+                throw new NotFoundException($"Событие с идентификатором '{id}' не найдено.");
 
             return Ok(eventItem);
         }
@@ -78,7 +91,7 @@ namespace ProjectWork.Controllers
         public IActionResult UpdateEvent(Guid id, Event eventItem)
         {
             if (!_eventService.UpdateEvent(id, eventItem))
-                return EventNotFound(id);
+                throw new NotFoundException($"Событие с идентификатором '{id}' не найдено.");
 
             return NoContent();
         }
@@ -96,18 +109,9 @@ namespace ProjectWork.Controllers
         public IActionResult DeleteEvent(Guid id)
         {
             if (!_eventService.DeleteEvent(id))
-                return EventNotFound(id);
+                throw new NotFoundException($"Событие с идентификатором '{id}' не найдено.");
 
             return NoContent();
         }
-
-        private ObjectResult EventNotFound(Guid id)
-        {
-            return Problem(
-                statusCode: StatusCodes.Status404NotFound,
-                title: "Событие не найдено",
-                detail: $"Событие с идентификатором '{id}' не найдено.");
-        }
-
     }
 }

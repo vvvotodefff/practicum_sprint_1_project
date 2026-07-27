@@ -1,16 +1,44 @@
-﻿
-using ProjectWork.Models;
-using ProjectWork.Services;
+﻿using ProjectWork.Models;
 
 namespace ProjectWork.Services;
 
 public class EventService : IEventService
 {
-    private static readonly List<Event> Events = [];
+    private readonly List<Event> Events = [];
 
-    public List<Event> GetEvents()
+    public PaginatedResult<Event> GetEvents(string? title, DateTime? from, DateTime? to, int page, int pageSize)
     {
-        return Events;
+        IEnumerable<Event> filteredEvents = Events;
+
+        if (!string.IsNullOrWhiteSpace(title))
+        {
+            filteredEvents = filteredEvents.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (from != null)
+        {
+            filteredEvents = filteredEvents.Where(e => e.StartAt >= from);
+        }
+
+        if (to != null)
+        {
+            filteredEvents = filteredEvents.Where(e => e.EndAt <= to);
+        }
+
+        var totalCount = filteredEvents.Count();
+
+        var items = filteredEvents
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return new PaginatedResult<Event>
+        {
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize,
+            Items = items
+        };
     }
 
     public Event? GetEventById(Guid id)
