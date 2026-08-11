@@ -17,9 +17,23 @@ public interface IBookingService
     /// </summary>
     Booking? GetBookingById(Guid id);
 
-    /// <summary>
+    /// <summary> 
     /// Создать бронь для события: присваивает новый идентификатор,
     /// статус <see cref="BookingStatus.Pending"/> и текущее время создания
     /// </summary>
     Booking AddBooking(Guid eventId);
+
+    /// <summary>
+    /// Асинхронно создать бронь для события: присваивает новый идентификатор   
+    /// </summary>
+    /// <param name="eventId"></param>
+    /// <returns></returns>
+    Task<Booking> CreateBookingAsync(Guid eventId);
+
+    /// <summary>
+    /// Асинхронно получить бронь по идентификатору. Возвращает null, если бронь не найдена
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
+    Task<Booking?> GetBookingByIdAsync(Guid id);
 }
