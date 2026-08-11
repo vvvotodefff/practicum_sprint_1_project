@@ -1,3 +1,4 @@
+using ProjectWork.Exceptions;
 using ProjectWork.Models;
 
 namespace ProjectWork.Services;
@@ -11,6 +12,16 @@ public class BookingService : IBookingService
 
     // Любое чтение и изменение списка под блокировкой
     private readonly object BookingsLock = new();
+
+    private readonly IEventService _eventService;
+
+    /// <summary>
+    /// Создаёт сервис бронирований
+    /// </summary>
+    public BookingService(IEventService eventService)
+    {
+        _eventService = eventService;
+    }
 
     /// <summary>
     /// Получить все брони
@@ -68,6 +79,10 @@ public class BookingService : IBookingService
     /// <returns></returns>
     public async Task<Booking> CreateBookingAsync(Guid eventId)
     {
+        // Бронировать можно только существующее событие
+        if (_eventService.GetEventById(eventId) is null)
+            throw new NotFoundException($"Событие с идентификатором '{eventId}' не найдено.");
+
         // Симуляция асинхронной операции
         await Task.Delay(100);
         return AddBooking(eventId);

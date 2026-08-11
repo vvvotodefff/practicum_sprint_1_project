@@ -12,15 +12,13 @@ namespace ProjectWork.Controllers
     public class BookingController : ControllerBase
     {
         private readonly IBookingService _bookingService;
-        private readonly IEventService _eventService;
 
         /// <summary>
         /// Создаёт контроллер бронирований
         /// </summary>
-        public BookingController(IBookingService bookingService, IEventService eventService)
+        public BookingController(IBookingService bookingService)
         {
             _bookingService = bookingService;
-            _eventService = eventService;
         }
 
         /// <summary>
@@ -35,9 +33,6 @@ namespace ProjectWork.Controllers
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
         public async Task<ActionResult<Booking>> BookEvent(Guid id)
         {
-            if (_eventService.GetEventById(id) is null)
-                throw new NotFoundException($"Событие с идентификатором '{id}' не найдено.");
-
             var booking = await _bookingService.CreateBookingAsync(id);
 
             return AcceptedAtAction(nameof(GetBookingById), new { id = booking.Id }, booking);
