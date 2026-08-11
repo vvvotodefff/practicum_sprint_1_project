@@ -24,4 +24,17 @@ public interface IBookingService
     /// </summary>
     /// <param name="bookingId">Идентификатор брони</param>
     Task<Booking?> GetBookingByIdAsync(Guid bookingId);
+
+    /// <summary>
+    /// Получить брони, ожидающие обработки (статус <see cref="BookingStatus.Pending"/>)
+    /// </summary>
+    List<Booking> GetPendingBookings();
+
+    /// <summary>
+    /// Перевести бронь в указанный статус и проставить время обработки.
+    /// Возвращает false, если бронь не найдена
+    /// </summary>
+    /// <param name="bookingId">Идентификатор брони</param>
+    /// <param name="status">Новый статус брони</param>
+    bool MarkAsProcessed(Guid bookingId, BookingStatus status);
 }
