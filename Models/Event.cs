@@ -15,6 +15,12 @@ public class Event : IValidatableObject
 
     public DateTime EndAt { get; set; }
 
+    public required int TotalSeats { get; set; }
+
+    public int AvailableSeats { get; set; }
+
+
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (StartAt == default)
@@ -33,6 +39,12 @@ public class Event : IValidatableObject
         {
             yield return new ValidationResult("Время окончания должно быть позже времени начала", [nameof(EndAt)]);
         }
+
+        if (TotalSeats <= 0)
+        {
+            yield return new ValidationResult("Общее количество мест должно быть положительным числом", [nameof(TotalSeats)]);
+        }
+
 
     }
 }

@@ -49,6 +49,7 @@ public class EventService : IEventService
     public void AddEvent(Event eventItem)
     {
         eventItem.Id = Guid.NewGuid();
+        eventItem.AvailableSeats = eventItem.TotalSeats;
         Events.Add(eventItem);
     }
 
@@ -63,6 +64,8 @@ public class EventService : IEventService
         existingEvent.Description = eventItem.Description;
         existingEvent.StartAt = eventItem.StartAt;
         existingEvent.EndAt = eventItem.EndAt;
+        existingEvent.TotalSeats = eventItem.TotalSeats;
+        existingEvent.AvailableSeats = eventItem.AvailableSeats;
         return true;
     }
 
@@ -76,4 +79,24 @@ public class EventService : IEventService
         Events.Remove(eventItem);
         return true;
     }
+
+    public bool TryReserveSeats(Guid eventId, int count = 1)
+    {
+        var eventItem = Events.FirstOrDefault(e => e.Id == eventId);
+        if (eventItem is null || eventItem.AvailableSeats < count)
+            return false;
+        eventItem.AvailableSeats -= count;
+        return true;
+    }
+
+    public bool TryReleaseSeats(Guid eventId, int count = 1)
+    {
+        var eventItem = Events.FirstOrDefault(e => e.Id == eventId);
+        if (eventItem is null || eventItem.AvailableSeats + count > eventItem.TotalSeats)
+            return false;
+        eventItem.AvailableSeats += count;
+        return true;
+    }
+
+
 }
