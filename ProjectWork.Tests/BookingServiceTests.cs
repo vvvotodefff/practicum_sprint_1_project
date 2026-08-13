@@ -1,3 +1,4 @@
+using ProjectWork.DTO;
 using ProjectWork.Exceptions;
 using ProjectWork.Models;
 using ProjectWork.Services;
@@ -14,18 +15,15 @@ public class BookingServiceTests
         _service = new BookingService(_eventService);
     }
 
-    private Event AddEvent()
+    private async Task<EventInfo> AddEvent()
     {
-        var eventItem = new Event
+        return await _eventService.CreateEventAsync(new CreateEvent
         {
             Title = "Концерт",
             StartAt = new DateTime(2026, 9, 1, 19, 0, 0),
             EndAt = new DateTime(2026, 9, 1, 22, 0, 0),
             TotalSeats = 100
-        };
-
-        _eventService.AddEvent(eventItem);
-        return eventItem;
+        });
     }
 
     // ----- Успешные сценарии -----
@@ -33,7 +31,7 @@ public class BookingServiceTests
     [Fact]
     public async Task CreateBookingAsync_ExistingEvent_ReturnsPendingBooking()
     {
-        var eventItem = AddEvent();
+        var eventItem = await AddEvent();
         var before = DateTime.UtcNow;
 
         var booking = await _service.CreateBookingAsync(eventItem.Id);
@@ -48,7 +46,7 @@ public class BookingServiceTests
     [Fact]
     public async Task CreateBookingAsync_SeveralBookingsForSameEvent_GetUniqueIds()
     {
-        var eventItem = AddEvent();
+        var eventItem = await AddEvent();
 
         var first = await _service.CreateBookingAsync(eventItem.Id);
         var second = await _service.CreateBookingAsync(eventItem.Id);
@@ -62,7 +60,7 @@ public class BookingServiceTests
     [Fact]
     public async Task CreateBookingAsync_StoresBookingInStorage()
     {
-        var eventItem = AddEvent();
+        var eventItem = await AddEvent();
 
         var booking = await _service.CreateBookingAsync(eventItem.Id);
 
@@ -73,7 +71,7 @@ public class BookingServiceTests
     [Fact]
     public async Task GetBookingByIdAsync_ExistingId_ReturnsBooking()
     {
-        var eventItem = AddEvent();
+        var eventItem = await AddEvent();
         var created = await _service.CreateBookingAsync(eventItem.Id);
 
         var found = await _service.GetBookingByIdAsync(created.Id);
@@ -89,7 +87,7 @@ public class BookingServiceTests
     [InlineData(BookingStatus.Rejected)]
     public async Task GetBookingByIdAsync_AfterProcessing_ReflectsStatusChange(BookingStatus status)
     {
-        var eventItem = AddEvent();
+        var eventItem = await AddEvent();
         var created = await _service.CreateBookingAsync(eventItem.Id);
         var before = DateTime.UtcNow;
 
@@ -106,7 +104,7 @@ public class BookingServiceTests
     [Fact]
     public async Task GetPendingBookings_ReturnsOnlyUnprocessedBookings()
     {
-        var eventItem = AddEvent();
+        var eventItem = await AddEvent();
         var first = await _service.CreateBookingAsync(eventItem.Id);
         await _service.CreateBookingAsync(eventItem.Id);
 
@@ -135,7 +133,7 @@ public class BookingServiceTests
     [Fact]
     public async Task CreateBookingAsync_DeletedEvent_ThrowsNotFound()
     {
-        var eventItem = AddEvent();
+        var eventItem = await AddEvent();
         _eventService.DeleteEvent(eventItem.Id);
 
         await Assert.ThrowsAsync<NotFoundException>(
@@ -147,7 +145,7 @@ public class BookingServiceTests
     [Fact]
     public async Task GetBookingByIdAsync_UnknownId_ReturnsNull()
     {
-        var eventItem = AddEvent();
+        var eventItem = await AddEvent();
         await _service.CreateBookingAsync(eventItem.Id);
 
         var found = await _service.GetBookingByIdAsync(Guid.NewGuid());

@@ -1,4 +1,5 @@
-﻿using ProjectWork.Models;
+﻿using ProjectWork.DTO;
+using ProjectWork.Models;
 
 namespace ProjectWork.Services;
 
@@ -46,11 +47,19 @@ public class EventService : IEventService
         return Events.FirstOrDefault(e => e.Id == id);
     }
 
-    public void AddEvent(Event eventItem)
+    public Task<EventInfo> CreateEventAsync(CreateEvent request)
     {
-        eventItem.Id = Guid.NewGuid();
-        eventItem.AvailableSeats = eventItem.TotalSeats;
+        // Фабрика проверяет данные, выдаёт Id и делает все места свободными
+        var eventItem = Event.Create(
+            request.Title,
+            request.Description,
+            request.StartAt,
+            request.EndAt,
+            request.TotalSeats ?? 0);
+
         Events.Add(eventItem);
+
+        return Task.FromResult(EventInfo.FromEvent(eventItem));
     }
 
     public bool UpdateEvent(Guid id, Event eventItem)

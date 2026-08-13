@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
+using ProjectWork.DTO;
 using ProjectWork.Services;
 using ProjectWork.Models;
 using ProjectWork.Exceptions;
@@ -62,18 +63,20 @@ namespace ProjectWork.Controllers
         }
 
         /// <summary>
-        /// Создать новое событие. ID события будет сгенерирован автоматически при сохранении в базе данных
+        /// Создать новое событие. ID и количество свободных мест назначает сервер
         /// </summary>
-        /// <param name="eventItem"></param>
+        /// <param name="request">Данные нового события</param>
         /// <returns></returns>
         /// <response code="201">Успешно создает новое событие и возвращает его с сгенерированным ID</response>
+        /// <response code="400">Некорректные данные события</response>
         [HttpPost]
-        [ProducesResponseType(typeof(Event), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(EventInfo), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-        public ActionResult<Event> CreateEvent(Event eventItem)
+        public async Task<ActionResult<EventInfo>> CreateEvent(CreateEvent request)
         {
-            _eventService.AddEvent(eventItem);
-            return CreatedAtAction(nameof(GetEventById), new { id = eventItem.Id }, eventItem);
+            var created = await _eventService.CreateEventAsync(request);
+
+            return CreatedAtAction(nameof(GetEventById), new { id = created.Id }, created);
         }
 
         /// <summary>
