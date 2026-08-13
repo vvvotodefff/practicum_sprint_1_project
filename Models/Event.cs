@@ -46,6 +46,33 @@ public class Event : IValidatableObject
         };
     }
 
+    /// <summary>
+    /// Обновить данные события. Количество свободных мест пересчитывается так,
+    /// чтобы уже занятые места сохранились. Бросает <see cref="ValidationException"/>,
+    /// если данные некорректны или новых мест меньше, чем уже занято
+    /// </summary>
+    public void Update(string title, string? description,
+        DateTime startAt, DateTime endAt, int totalSeats)
+    {
+        var errors = GetErrors(title, startAt, endAt, totalSeats).ToList();
+
+        if (errors.Count > 0)
+            throw new ValidationException(string.Join(" ", errors.Select(e => e.Message)));
+
+        var occupiedSeats = TotalSeats - AvailableSeats;
+
+        if (totalSeats < occupiedSeats)
+            throw new ValidationException(
+                $"Нельзя установить {totalSeats} мест: уже занято {occupiedSeats}");
+
+        Title = title;
+        Description = description;
+        StartAt = startAt;
+        EndAt = endAt;
+        TotalSeats = totalSeats;
+        AvailableSeats = totalSeats - occupiedSeats;
+    }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         foreach (var (field, message) in GetErrors(Title, StartAt, EndAt, TotalSeats))

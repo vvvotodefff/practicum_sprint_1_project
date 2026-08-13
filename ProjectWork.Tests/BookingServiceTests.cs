@@ -116,6 +116,46 @@ public class BookingServiceTests
         Assert.DoesNotContain(pending, b => b.Id == first.Id);
     }
 
+    // ----- Смена статуса брони -----
+
+    [Fact]
+    public async Task Confirm_SetsConfirmedStatusAndProcessedAt()
+    {
+        var eventItem = await AddEvent();
+        var booking = await _service.CreateBookingAsync(eventItem.Id);
+        var before = DateTime.UtcNow;
+
+        booking.Confirm();
+
+        Assert.Equal(BookingStatus.Confirmed, booking.Status);
+        Assert.NotNull(booking.ProcessedAt);
+        Assert.InRange(booking.ProcessedAt.Value, before, DateTime.UtcNow);
+    }
+
+    [Fact]
+    public async Task Reject_SetsRejectedStatusAndProcessedAt()
+    {
+        var eventItem = await AddEvent();
+        var booking = await _service.CreateBookingAsync(eventItem.Id);
+
+        booking.Reject();
+
+        Assert.Equal(BookingStatus.Rejected, booking.Status);
+        Assert.NotNull(booking.ProcessedAt);
+    }
+
+    [Fact]
+    public async Task MarkAsProcessed_PendingStatus_ReturnsFalse()
+    {
+        var eventItem = await AddEvent();
+        var booking = await _service.CreateBookingAsync(eventItem.Id);
+
+        var result = _service.MarkAsProcessed(booking.Id, BookingStatus.Pending);
+
+        Assert.False(result);
+        Assert.Null(booking.ProcessedAt);
+    }
+
     // ----- Места на событии -----
 
     [Fact]

@@ -12,6 +12,20 @@ public interface IEventService
     /// Создать событие из данных запроса. Бросает ValidationException, если данные некорректны
     /// </summary>
     Task<EventInfo> CreateEventAsync(CreateEvent request);
-    bool UpdateEvent(Guid id, Event eventItem);
+    /// <summary>
+    /// Обновить событие. Свободные места пересчитываются сервером
+    /// </summary>
+    bool UpdateEvent(Guid id, UpdateEvent request);
     bool DeleteEvent(Guid id);
+
+    /// <summary>
+    /// Занять места на событии. Возвращает false, если свободных мест не хватает.
+    /// Бросает NotFoundException, если события нет
+    /// </summary>
+    bool TryReserveSeats(Guid eventId, int count = 1);
+
+    /// <summary>
+    /// Вернуть места в пул. Если события уже нет, ничего не делает
+    /// </summary>
+    void ReleaseSeats(Guid eventId, int count = 1);
 }

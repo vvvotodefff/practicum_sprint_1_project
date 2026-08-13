@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using ProjectWork.DTO;
+using ProjectWork.Exceptions;
 using ProjectWork.Models;
 using ProjectWork.Services;
 
@@ -17,7 +18,7 @@ public class EventServiceTests
         TotalSeats = totalSeats
     };
 
-    private static Event CreateEntity(string title, DateTime startAt, DateTime endAt, int totalSeats = 100) => new()
+    private static UpdateEvent NewUpdate(string title, DateTime startAt, DateTime endAt, int totalSeats = 100) => new()
     {
         Title = title,
         StartAt = startAt,
@@ -101,7 +102,7 @@ public class EventServiceTests
     public async Task UpdateEvent_ExistingId_UpdatesFieldsAndReturnsTrue()
     {
         var added = await AddEvent("Старое название", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
-        var newData = CreateEntity("Новое название", new DateTime(2026, 7, 11, 12, 0, 0), new DateTime(2026, 7, 11, 13, 0, 0));
+        var newData = NewUpdate("Новое название", new DateTime(2026, 7, 11, 12, 0, 0), new DateTime(2026, 7, 11, 13, 0, 0));
         newData.Description = "Обновлённое описание";
 
         var updated = _service.UpdateEvent(added.Id, newData);
@@ -230,11 +231,57 @@ public class EventServiceTests
     [Fact]
     public void UpdateEvent_UnknownId_ReturnsFalse()
     {
-        var newData = CreateEntity("Новое название", new DateTime(2026, 7, 11, 12, 0, 0), new DateTime(2026, 7, 11, 13, 0, 0));
+        var newData = NewUpdate("Новое название", new DateTime(2026, 7, 11, 12, 0, 0), new DateTime(2026, 7, 11, 13, 0, 0));
 
         var updated = _service.UpdateEvent(Guid.NewGuid(), newData);
 
         Assert.False(updated);
+    }
+
+    [Fact]
+    public async Task UpdateEvent_ChangingTotalSeats_KeepsOccupiedSeats()
+    {
+        var added = await AddEvent("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 100);
+        _service.TryReserveSeats(added.Id, 40);
+
+        // Зал расширили до 150 — занятые 40 мест должны сохраниться
+        var updated = _service.UpdateEvent(added.Id,
+            NewUpdate("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 150));
+
+        Assert.True(updated);
+        var stored = _service.GetEventById(added.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(150, stored.TotalSeats);
+        Assert.Equal(110, stored.AvailableSeats);
+    }
+
+    [Fact]
+    public async Task UpdateEvent_TotalSeatsBelowOccupied_ThrowsValidationException()
+    {
+        var added = await AddEvent("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 10);
+        _service.TryReserveSeats(added.Id, 6);
+
+        Assert.Throws<ValidationException>(() => _service.UpdateEvent(added.Id,
+            NewUpdate("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 5)));
+
+        // Событие осталось нетронутым
+        var stored = _service.GetEventById(added.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(10, stored.TotalSeats);
+        Assert.Equal(4, stored.AvailableSeats);
+    }
+
+    [Fact]
+    public async Task UpdateEvent_DoesNotResetOccupiedSeats()
+    {
+        var added = await AddEvent("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 10);
+        _service.TryReserveSeats(added.Id, 3);
+
+        // Клиент присылает те же 10 мест — свободных всё равно должно остаться 7
+        _service.UpdateEvent(added.Id,
+            NewUpdate("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 10));
+
+        Assert.Equal(7, _service.GetEventById(added.Id)!.AvailableSeats);
     }
 
     [Fact]
@@ -359,6 +406,50 @@ public class EventServiceTests
 
         Assert.False(reserved);
         Assert.Equal(2, eventItem.AvailableSeats);
+    }
+
+    [Fact]
+    public async Task Service_TryReserveSeats_DecreasesAvailableSeats()
+    {
+        var created = await AddEvent("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 5);
+
+        var reserved = _service.TryReserveSeats(created.Id, 2);
+
+        Assert.True(reserved);
+        Assert.Equal(3, _service.GetEventById(created.Id)!.AvailableSeats);
+    }
+
+    [Fact]
+    public async Task Service_TryReserveSeats_NotEnoughSeats_ReturnsFalse()
+    {
+        var created = await AddEvent("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 1);
+
+        Assert.False(_service.TryReserveSeats(created.Id, 2));
+        Assert.Equal(1, _service.GetEventById(created.Id)!.AvailableSeats);
+    }
+
+    [Fact]
+    public void Service_TryReserveSeats_UnknownEvent_ThrowsNotFound()
+    {
+        Assert.Throws<NotFoundException>(() => _service.TryReserveSeats(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task Service_ReleaseSeats_ReturnsSeatToPool()
+    {
+        var created = await AddEvent("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 5);
+        _service.TryReserveSeats(created.Id, 3);
+
+        _service.ReleaseSeats(created.Id, 2);
+
+        Assert.Equal(4, _service.GetEventById(created.Id)!.AvailableSeats);
+    }
+
+    [Fact]
+    public void Service_ReleaseSeats_UnknownEvent_DoesNothing()
+    {
+        // Событие могли удалить — компенсация не должна падать
+        _service.ReleaseSeats(Guid.NewGuid());
     }
 
     [Fact]

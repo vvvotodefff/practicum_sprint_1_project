@@ -82,18 +82,19 @@ namespace ProjectWork.Controllers
         /// <summary>
         /// Обновить существующее событие по его уникальному идентификатору ID.
         /// </summary>
-        /// <param name="id"></param>
-        /// <param name="eventItem"></param>
+        /// <param name="id">Идентификатор события</param>
+        /// <param name="request">Новые данные события. Свободные места пересчитывает сервер</param>
         /// <returns></returns>
         /// <response code="204">Успешно обновляет событие с указанным ID</response>
+        /// <response code="400">Некорректные данные или мест меньше, чем уже занято</response>
         /// <response code ="404">Событие с указанным ID не найдено</response>
         [HttpPut("{id:guid}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-        public IActionResult UpdateEvent(Guid id, Event eventItem)
+        public IActionResult UpdateEvent(Guid id, UpdateEvent request)
         {
-            if (!_eventService.UpdateEvent(id, eventItem))
+            if (!_eventService.UpdateEvent(id, request))
                 throw new NotFoundException($"Событие с идентификатором '{id}' не найдено.");
 
             return NoContent();

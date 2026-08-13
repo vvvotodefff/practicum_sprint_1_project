@@ -73,15 +73,14 @@ public class BookingService : IBookingService
     /// <returns></returns>
     public Task<Booking> CreateBookingAsync(Guid eventId)
     {
-        // Критическая секция: поиск события, занятие места и создание брони
-        // выполняются целиком, без вмешательства других потоков
+        // Критическая секция: занятие места и создание брони
+        // выполняются целиком, без вмешательства других потоков.
+        // Порядок захвата всегда один: сначала замок броней, потом замок событий
         lock (_bookingLock)
         {
-            // Бронировать можно только существующее событие
-            var eventItem = _eventService.GetEventById(eventId)
-                ?? throw new NotFoundException($"Событие с идентификатором '{eventId}' не найдено.");
-
-            if (!eventItem.TryReserveSeats())
+            // Событие ищет и занимает место сам EventService — под своей блокировкой.
+            // Если события нет, оттуда прилетит NotFoundException
+            if (!_eventService.TryReserveSeats(eventId))
                 throw new NoAvailableSeatsException("No available seats for this event");
 
             return Task.FromResult(AddBooking(eventId));
@@ -118,8 +117,19 @@ public class BookingService : IBookingService
         if (!Bookings.TryGetValue(bookingId, out var booking))
             return false;
 
-        booking.Status = status;
-        booking.ProcessedAt = DateTime.UtcNow;
-        return true;
+        switch (status)
+        {
+            case BookingStatus.Confirmed:
+                booking.Confirm();
+                return true;
+
+            case BookingStatus.Rejected:
+                booking.Reject();
+                return true;
+
+            // Pending — не результат обработки, такой переход не поддерживаем
+            default:
+                return false;
+        }
     }
 }
