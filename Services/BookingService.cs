@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using ProjectWork.Exceptions;
 using ProjectWork.Models;
 
@@ -8,10 +9,11 @@ namespace ProjectWork.Services;
 /// </summary>
 public class BookingService : IBookingService
 {
-    private readonly List<Booking> Bookings = [];
+    // Потокобезопасное хранилище: чтение и добавление не требуют блокировки
+    private readonly ConcurrentDictionary<Guid, Booking> Bookings = new();
 
-    // Любое чтение и изменение списка под блокировкой
-    private readonly object BookingsLock = new();
+    // Замок нужен только для атомарной пары «проверить места + создать бронь»
+    private readonly object _bookingLock = new();
 
     private readonly IEventService _eventService;
 
@@ -29,10 +31,7 @@ public class BookingService : IBookingService
     /// <returns></returns>
     public List<Booking> GetBookings()
     {
-        lock (BookingsLock)
-        {
-            return Bookings.ToList();
-        }
+        return Bookings.Values.ToList();
     }
 
     /// <summary>
@@ -42,10 +41,7 @@ public class BookingService : IBookingService
     /// <returns></returns>
     private Booking? GetBookingById(Guid id)
     {
-        lock (BookingsLock)
-        {
-            return Bookings.FirstOrDefault(b => b.Id == id);
-        }
+        return Bookings.TryGetValue(id, out var booking) ? booking : null;
     }
 
     /// <summary>
@@ -64,28 +60,32 @@ public class BookingService : IBookingService
             ProcessedAt = null
         };
 
-        lock (BookingsLock)
-        {
-            Bookings.Add(booking);
-        }
+        Bookings[booking.Id] = booking;
 
         return booking;
     }
 
     /// <summary>
-    /// Асинхронно создать бронь для события: присваивает новый идентификатор
+    /// Создать бронь для события: занимает место и сохраняет бронь.
+    /// Бросает <see cref="NoAvailableSeatsException"/>, если свободных мест нет
     /// </summary>
     /// <param name="eventId"></param>
     /// <returns></returns>
-    public async Task<Booking> CreateBookingAsync(Guid eventId)
+    public Task<Booking> CreateBookingAsync(Guid eventId)
     {
-        // Бронировать можно только существующее событие
-        if (_eventService.GetEventById(eventId) is null)
-            throw new NotFoundException($"Событие с идентификатором '{eventId}' не найдено.");
+        // Критическая секция: поиск события, занятие места и создание брони
+        // выполняются целиком, без вмешательства других потоков
+        lock (_bookingLock)
+        {
+            // Бронировать можно только существующее событие
+            var eventItem = _eventService.GetEventById(eventId)
+                ?? throw new NotFoundException($"Событие с идентификатором '{eventId}' не найдено.");
 
-        // Симуляция асинхронной операции
-        await Task.Delay(100);
-        return AddBooking(eventId);
+            if (!eventItem.TryReserveSeats())
+                throw new NoAvailableSeatsException("No available seats for this event");
+
+            return Task.FromResult(AddBooking(eventId));
+        }
     }
 
     /// <summary>
@@ -93,23 +93,18 @@ public class BookingService : IBookingService
     /// </summary>
     /// <param name="id"></param>
     /// <returns></returns>
-    public async Task<Booking?> GetBookingByIdAsync(Guid id)
+    public Task<Booking?> GetBookingByIdAsync(Guid id)
     {
-        // Симуляция асинхронной операции
-        await Task.Delay(100);
-        return GetBookingById(id);
+        return Task.FromResult(GetBookingById(id));
     }
 
     /// <summary>
     /// Получить брони, ожидающие обработки (статус Pending)
     /// </summary>
-    /// <returns>Копия списка/returns>
+    /// <returns>Копия списка</returns>
     public List<Booking> GetPendingBookings()
     {
-        lock (BookingsLock)
-        {
-            return Bookings.Where(b => b.Status == BookingStatus.Pending).ToList();
-        }
+        return Bookings.Values.Where(b => b.Status == BookingStatus.Pending).ToList();
     }
 
     /// <summary>
@@ -120,16 +115,11 @@ public class BookingService : IBookingService
     /// <returns>false, если бронь с таким идентификатором не найдена</returns>
     public bool MarkAsProcessed(Guid bookingId, BookingStatus status)
     {
-        lock (BookingsLock)
-        {
-            var booking = Bookings.FirstOrDefault(b => b.Id == bookingId);
+        if (!Bookings.TryGetValue(bookingId, out var booking))
+            return false;
 
-            if (booking is null)
-                return false;
-
-            booking.Status = status;
-            booking.ProcessedAt = DateTime.UtcNow;
-            return true;
-        }
+        booking.Status = status;
+        booking.ProcessedAt = DateTime.UtcNow;
+        return true;
     }
 }

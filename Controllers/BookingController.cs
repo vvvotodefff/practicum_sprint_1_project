@@ -28,9 +28,11 @@ namespace ProjectWork.Controllers
         /// <returns></returns>
         /// <response code="202">Бронь принята к обработке, ссылка на неё — в заголовке</response>
         /// <response code="404">Событие с указанным ID не найдено</response>
+        /// <response code="409">На событии не осталось свободных мест</response>
         [HttpPost("events/{id:guid}/book")]
         [ProducesResponseType(typeof(Booking), StatusCodes.Status202Accepted)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
         public async Task<ActionResult<Booking>> BookEvent(Guid id)
         {
             var booking = await _bookingService.CreateBookingAsync(id);

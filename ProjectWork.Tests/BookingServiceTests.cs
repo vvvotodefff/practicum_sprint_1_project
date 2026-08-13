@@ -15,14 +15,14 @@ public class BookingServiceTests
         _service = new BookingService(_eventService);
     }
 
-    private async Task<EventInfo> AddEvent()
+    private async Task<EventInfo> AddEvent(int totalSeats = 100)
     {
         return await _eventService.CreateEventAsync(new CreateEvent
         {
             Title = "Концерт",
             StartAt = new DateTime(2026, 9, 1, 19, 0, 0),
             EndAt = new DateTime(2026, 9, 1, 22, 0, 0),
-            TotalSeats = 100
+            TotalSeats = totalSeats
         });
     }
 
@@ -114,6 +114,53 @@ public class BookingServiceTests
 
         Assert.Single(pending);
         Assert.DoesNotContain(pending, b => b.Id == first.Id);
+    }
+
+    // ----- Места на событии -----
+
+    [Fact]
+    public async Task CreateBookingAsync_ReservesSeatOnEvent()
+    {
+        var eventItem = await AddEvent(10);
+
+        await _service.CreateBookingAsync(eventItem.Id);
+        await _service.CreateBookingAsync(eventItem.Id);
+
+        var stored = _eventService.GetEventById(eventItem.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(8, stored.AvailableSeats);
+        Assert.Equal(10, stored.TotalSeats);
+    }
+
+    [Fact]
+    public async Task CreateBookingAsync_NoSeatsLeft_ThrowsNoAvailableSeats()
+    {
+        var eventItem = await AddEvent(1);
+
+        var first = await _service.CreateBookingAsync(eventItem.Id);
+
+        var exception = await Assert.ThrowsAsync<NoAvailableSeatsException>(
+            () => _service.CreateBookingAsync(eventItem.Id));
+
+        Assert.Equal("No available seats for this event", exception.Message);
+        Assert.Equal(BookingStatus.Pending, first.Status);
+
+        var stored = _eventService.GetEventById(eventItem.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(0, stored.AvailableSeats);
+    }
+
+    [Fact]
+    public async Task CreateBookingAsync_NoSeatsLeft_DoesNotCreateBooking()
+    {
+        var eventItem = await AddEvent(1);
+
+        await _service.CreateBookingAsync(eventItem.Id);
+        await Assert.ThrowsAsync<NoAvailableSeatsException>(
+            () => _service.CreateBookingAsync(eventItem.Id));
+
+        // В хранилище осталась только успешная бронь
+        Assert.Single(_service.GetBookings());
     }
 
     // ----- Неуспешные сценарии -----
