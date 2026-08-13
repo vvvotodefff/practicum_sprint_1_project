@@ -20,7 +20,8 @@ public class BookingServiceTests
         {
             Title = "Концерт",
             StartAt = new DateTime(2026, 9, 1, 19, 0, 0),
-            EndAt = new DateTime(2026, 9, 1, 22, 0, 0)
+            EndAt = new DateTime(2026, 9, 1, 22, 0, 0),
+            TotalSeats = 100
         };
 
         _eventService.AddEvent(eventItem);

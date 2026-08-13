@@ -7,16 +7,17 @@ public class EventServiceTests
 {
     private readonly EventService _service = new();
 
-    private static Event CreateEvent(string title, DateTime startAt, DateTime endAt) => new()
+    private static Event CreateEvent(string title, DateTime startAt, DateTime endAt, int totalSeats) => new()
     {
         Title = title,
         StartAt = startAt,
-        EndAt = endAt
+        EndAt = endAt,
+        TotalSeats = totalSeats
     };
 
-    private Event AddEvent(string title, DateTime startAt, DateTime endAt)
+    private Event AddEvent(string title, DateTime startAt, DateTime endAt, int totalSeats)
     {
-        var eventItem = CreateEvent(title, startAt, endAt);
+        var eventItem = CreateEvent(title, startAt, endAt, totalSeats);
         _service.AddEvent(eventItem);
         return eventItem;
     }
@@ -28,7 +29,7 @@ public class EventServiceTests
     [Fact]
     public void AddEvent_AssignsNewIdAndStoresEvent()
     {
-        var eventItem = CreateEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
+        var eventItem = CreateEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0), 100);
 
         _service.AddEvent(eventItem);
 
@@ -40,9 +41,9 @@ public class EventServiceTests
     [Fact]
     public void GetEvents_ReturnsAllEvents()
     {
-        AddEvent("Первое", new DateTime(2026, 7, 1, 9, 0, 0), new DateTime(2026, 7, 1, 10, 0, 0));
-        AddEvent("Второе", new DateTime(2026, 7, 2, 9, 0, 0), new DateTime(2026, 7, 2, 10, 0, 0));
-        AddEvent("Третье", new DateTime(2026, 7, 3, 9, 0, 0), new DateTime(2026, 7, 3, 10, 0, 0));
+        AddEvent("Первое", new DateTime(2026, 7, 1, 9, 0, 0), new DateTime(2026, 7, 1, 10, 0, 0), 100);
+        AddEvent("Второе", new DateTime(2026, 7, 2, 9, 0, 0), new DateTime(2026, 7, 2, 10, 0, 0), 100);
+        AddEvent("Третье", new DateTime(2026, 7, 3, 9, 0, 0), new DateTime(2026, 7, 3, 10, 0, 0), 100);
 
         var result = GetAll();
 
@@ -53,7 +54,7 @@ public class EventServiceTests
     [Fact]
     public void GetEventById_ExistingId_ReturnsEvent()
     {
-        var added = AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
+        var added = AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0), 100);
 
         var found = _service.GetEventById(added.Id);
 
@@ -65,8 +66,8 @@ public class EventServiceTests
     [Fact]
     public void UpdateEvent_ExistingId_UpdatesFieldsAndReturnsTrue()
     {
-        var added = AddEvent("Старое название", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
-        var newData = CreateEvent("Новое название", new DateTime(2026, 7, 11, 12, 0, 0), new DateTime(2026, 7, 11, 13, 0, 0));
+        var added = AddEvent("Старое название", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0), 100);
+        var newData = CreateEvent("Новое название", new DateTime(2026, 7, 11, 12, 0, 0), new DateTime(2026, 7, 11, 13, 0, 0), 100);
         newData.Description = "Обновлённое описание";
 
         var updated = _service.UpdateEvent(added.Id, newData);
@@ -83,7 +84,7 @@ public class EventServiceTests
     [Fact]
     public void DeleteEvent_ExistingId_RemovesEventAndReturnsTrue()
     {
-        var added = AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
+        var added = AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0), 100);
 
         var deleted = _service.DeleteEvent(added.Id);
 
@@ -95,9 +96,9 @@ public class EventServiceTests
     [Fact]
     public void GetEvents_FilterByTitle_IsCaseInsensitiveAndMatchesPartially()
     {
-        AddEvent("Встреча с командой", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
-        AddEvent("встреча с заказчиком", new DateTime(2026, 7, 20, 15, 0, 0), new DateTime(2026, 7, 20, 16, 0, 0));
-        AddEvent("Отпуск", new DateTime(2026, 8, 1, 0, 0, 0), new DateTime(2026, 8, 15, 0, 0, 0));
+        AddEvent("Встреча с командой", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0), 100);
+        AddEvent("встреча с заказчиком", new DateTime(2026, 7, 20, 15, 0, 0), new DateTime(2026, 7, 20, 16, 0, 0), 100);
+        AddEvent("Отпуск", new DateTime(2026, 8, 1, 0, 0, 0), new DateTime(2026, 8, 15, 0, 0, 0), 100);
 
         var result = _service.GetEvents("ВСТРЕЧА", null, null, 1, 100);
 
@@ -108,9 +109,9 @@ public class EventServiceTests
     [Fact]
     public void GetEvents_FilterByFrom_ReturnsEventsStartingAtOrAfterDate()
     {
-        AddEvent("Раннее", new DateTime(2026, 7, 1, 9, 0, 0), new DateTime(2026, 7, 1, 10, 0, 0));
-        AddEvent("Граничное", new DateTime(2026, 7, 15, 0, 0, 0), new DateTime(2026, 7, 15, 1, 0, 0));
-        AddEvent("Позднее", new DateTime(2026, 7, 20, 9, 0, 0), new DateTime(2026, 7, 20, 10, 0, 0));
+        AddEvent("Раннее", new DateTime(2026, 7, 1, 9, 0, 0), new DateTime(2026, 7, 1, 10, 0, 0), 100);
+        AddEvent("Граничное", new DateTime(2026, 7, 15, 0, 0, 0), new DateTime(2026, 7, 15, 1, 0, 0), 100);
+        AddEvent("Позднее", new DateTime(2026, 7, 20, 9, 0, 0), new DateTime(2026, 7, 20, 10, 0, 0), 100);
 
         var result = _service.GetEvents(null, new DateTime(2026, 7, 15, 0, 0, 0), null, 1, 100);
 
@@ -121,9 +122,9 @@ public class EventServiceTests
     [Fact]
     public void GetEvents_FilterByTo_ReturnsEventsEndingAtOrBeforeDate()
     {
-        AddEvent("Раннее", new DateTime(2026, 7, 1, 9, 0, 0), new DateTime(2026, 7, 1, 10, 0, 0));
-        AddEvent("Граничное", new DateTime(2026, 7, 14, 23, 0, 0), new DateTime(2026, 7, 15, 0, 0, 0));
-        AddEvent("Позднее", new DateTime(2026, 7, 20, 9, 0, 0), new DateTime(2026, 7, 20, 10, 0, 0));
+        AddEvent("Раннее", new DateTime(2026, 7, 1, 9, 0, 0), new DateTime(2026, 7, 1, 10, 0, 0), 100);
+        AddEvent("Граничное", new DateTime(2026, 7, 14, 23, 0, 0), new DateTime(2026, 7, 15, 0, 0, 0), 100);
+        AddEvent("Позднее", new DateTime(2026, 7, 20, 9, 0, 0), new DateTime(2026, 7, 20, 10, 0, 0), 100);
 
         var result = _service.GetEvents(null, null, new DateTime(2026, 7, 15, 0, 0, 0), 1, 100);
 
@@ -136,7 +137,7 @@ public class EventServiceTests
     {
         for (var day = 1; day <= 12; day++)
         {
-            AddEvent($"Событие {day:00}", new DateTime(2026, 7, day, 9, 0, 0), new DateTime(2026, 7, day, 10, 0, 0));
+            AddEvent($"Событие {day:00}", new DateTime(2026, 7, day, 9, 0, 0), new DateTime(2026, 7, day, 10, 0, 0), 100);
         }
 
         var result = _service.GetEvents(null, null, null, 2, 5);
@@ -152,7 +153,7 @@ public class EventServiceTests
     [Fact]
     public void GetEvents_PageBeyondRange_ReturnsEmptyItemsButKeepsTotalCount()
     {
-        AddEvent("Единственное", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
+        AddEvent("Единственное", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0), 100);
 
         var result = _service.GetEvents(null, null, null, 99, 10);
 
@@ -163,10 +164,10 @@ public class EventServiceTests
     [Fact]
     public void GetEvents_CombinedFilters_AppliesAllTogether()
     {
-        AddEvent("Встреча с командой", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
-        AddEvent("встреча с заказчиком", new DateTime(2026, 7, 20, 15, 0, 0), new DateTime(2026, 7, 20, 16, 0, 0));
-        AddEvent("Встреча выпускников", new DateTime(2026, 8, 5, 18, 0, 0), new DateTime(2026, 8, 5, 21, 0, 0));
-        AddEvent("Отпуск", new DateTime(2026, 7, 21, 0, 0, 0), new DateTime(2026, 7, 25, 0, 0, 0));
+        AddEvent("Встреча с командой", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0), 100);
+        AddEvent("встреча с заказчиком", new DateTime(2026, 7, 20, 15, 0, 0), new DateTime(2026, 7, 20, 16, 0, 0), 100);
+        AddEvent("Встреча выпускников", new DateTime(2026, 8, 5, 18, 0, 0), new DateTime(2026, 8, 5, 21, 0, 0), 100);
+        AddEvent("Отпуск", new DateTime(2026, 7, 21, 0, 0, 0), new DateTime(2026, 7, 25, 0, 0, 0), 100);
 
         var result = _service.GetEvents(
             "встреча",
@@ -185,7 +186,7 @@ public class EventServiceTests
     [Fact]
     public void GetEventById_UnknownId_ReturnsNull()
     {
-        AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
+        AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0), 100);
 
         var found = _service.GetEventById(Guid.NewGuid());
 
@@ -195,7 +196,7 @@ public class EventServiceTests
     [Fact]
     public void UpdateEvent_UnknownId_ReturnsFalse()
     {
-        var newData = CreateEvent("Новое название", new DateTime(2026, 7, 11, 12, 0, 0), new DateTime(2026, 7, 11, 13, 0, 0));
+        var newData = CreateEvent("Новое название", new DateTime(2026, 7, 11, 12, 0, 0), new DateTime(2026, 7, 11, 13, 0, 0), 100);
 
         var updated = _service.UpdateEvent(Guid.NewGuid(), newData);
 
@@ -205,7 +206,7 @@ public class EventServiceTests
     [Fact]
     public void DeleteEvent_UnknownId_ReturnsFalse()
     {
-        AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
+        AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0), 100);
 
         var deleted = _service.DeleteEvent(Guid.NewGuid());
 
@@ -229,8 +230,8 @@ public class EventServiceTests
     [InlineData("   ")]
     public void GetEvents_EmptyOrWhitespaceTitle_IgnoresFilter(string title)
     {
-        AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
-        AddEvent("Отпуск", new DateTime(2026, 8, 1, 0, 0, 0), new DateTime(2026, 8, 15, 0, 0, 0));
+        AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0), 100);
+        AddEvent("Отпуск", new DateTime(2026, 8, 1, 0, 0, 0), new DateTime(2026, 8, 15, 0, 0, 0), 100);
 
         var result = _service.GetEvents(title, null, null, 1, 100);
 
@@ -240,7 +241,7 @@ public class EventServiceTests
     [Fact]
     public void GetEvents_TitleWithoutMatches_ReturnsEmptyResult()
     {
-        AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
+        AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0), 100    );
 
         var result = _service.GetEvents("абракадабра", null, null, 1, 100);
 
@@ -253,7 +254,7 @@ public class EventServiceTests
     {
         var startAt = new DateTime(2026, 7, 10, 9, 0, 0);
         var endAt = new DateTime(2026, 7, 10, 10, 0, 0);
-        AddEvent("Граничное", startAt, endAt);
+        AddEvent("Граничное", startAt, endAt, 100);
 
         // Границы диапазона совпадают с датами события — сравнение нестрогое
         var result = _service.GetEvents(null, startAt, endAt, 1, 100);
@@ -265,7 +266,7 @@ public class EventServiceTests
     [Fact]
     public void GetEvents_FromGreaterThanTo_ReturnsEmptyResult()
     {
-        AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
+        AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0), 100);
 
         var result = _service.GetEvents(null, new DateTime(2026, 8, 1, 0, 0, 0), new DateTime(2026, 7, 1, 0, 0, 0), 1, 100);
 
@@ -278,7 +279,7 @@ public class EventServiceTests
     {
         for (var day = 1; day <= 12; day++)
         {
-            AddEvent($"Событие {day:00}", new DateTime(2026, 7, day, 9, 0, 0), new DateTime(2026, 7, day, 10, 0, 0));
+            AddEvent($"Событие {day:00}", new DateTime(2026, 7, day, 9, 0, 0), new DateTime(2026, 7, day, 10, 0, 0), 100);
         }
 
         var result = _service.GetEvents(null, null, null, 3, 5);
@@ -292,8 +293,8 @@ public class EventServiceTests
     [Fact]
     public void GetEvents_PageSizeLargerThanTotal_ReturnsAllItems()
     {
-        AddEvent("Первое", new DateTime(2026, 7, 1, 9, 0, 0), new DateTime(2026, 7, 1, 10, 0, 0));
-        AddEvent("Второе", new DateTime(2026, 7, 2, 9, 0, 0), new DateTime(2026, 7, 2, 10, 0, 0));
+        AddEvent("Первое", new DateTime(2026, 7, 1, 9, 0, 0), new DateTime(2026, 7, 1, 10, 0, 0), 100);
+        AddEvent("Второе", new DateTime(2026, 7, 2, 9, 0, 0), new DateTime(2026, 7, 2, 10, 0, 0), 100);
 
         var result = _service.GetEvents(null, null, null, 1, 100);
 

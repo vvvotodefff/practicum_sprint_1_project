@@ -79,24 +79,4 @@ public class EventService : IEventService
         Events.Remove(eventItem);
         return true;
     }
-
-    public bool TryReserveSeats(Guid eventId, int count = 1)
-    {
-        var eventItem = Events.FirstOrDefault(e => e.Id == eventId);
-        if (eventItem is null || eventItem.AvailableSeats < count)
-            return false;
-        eventItem.AvailableSeats -= count;
-        return true;
-    }
-
-    public bool TryReleaseSeats(Guid eventId, int count = 1)
-    {
-        var eventItem = Events.FirstOrDefault(e => e.Id == eventId);
-        if (eventItem is null || eventItem.AvailableSeats + count > eventItem.TotalSeats)
-            return false;
-        eventItem.AvailableSeats += count;
-        return true;
-    }
-
-
 }

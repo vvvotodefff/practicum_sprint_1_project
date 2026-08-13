@@ -44,8 +44,29 @@ public class Event : IValidatableObject
         {
             yield return new ValidationResult("Общее количество мест должно быть положительным числом", [nameof(TotalSeats)]);
         }
-
-
     }
+
+    public bool TryReserveSeats(int count = 1)
+    {
+        if (AvailableSeats < count)
+            return false;
+        AvailableSeats -= count;
+        return true;
+    }
+
+    public bool ReleaseSeats(int count = 1)
+    {
+        if (AvailableSeats + count > TotalSeats)
+        {
+            AvailableSeats = TotalSeats;
+        }
+        else
+        { 
+            AvailableSeats += count; 
+        }
+        
+        return true;
+    }
+
 }
 

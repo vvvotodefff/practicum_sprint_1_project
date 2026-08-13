@@ -22,7 +22,8 @@ public class EventValidationTests
         {
             Title = "Встреча",
             StartAt = new DateTime(2026, 7, 10, 9, 0, 0),
-            EndAt = new DateTime(2026, 7, 10, 10, 0, 0)
+            EndAt = new DateTime(2026, 7, 10, 10, 0, 0),
+            TotalSeats = 100
         };
 
         var results = Validate(eventItem);
@@ -37,7 +38,8 @@ public class EventValidationTests
         {
             Title = "",
             StartAt = new DateTime(2026, 7, 10, 9, 0, 0),
-            EndAt = new DateTime(2026, 7, 10, 10, 0, 0)
+            EndAt = new DateTime(2026, 7, 10, 10, 0, 0), 
+            TotalSeats = 100
         };
 
         var results = Validate(eventItem);
@@ -50,7 +52,8 @@ public class EventValidationTests
     {
         var eventItem = new Event
         {
-            Title = "Встреча"
+            Title = "Встреча",
+            TotalSeats = 100
             // StartAt и EndAt не заданы — остаются default
         };
 
@@ -67,7 +70,8 @@ public class EventValidationTests
         {
             Title = "Встреча",
             StartAt = new DateTime(2026, 7, 10, 10, 0, 0),
-            EndAt = new DateTime(2026, 7, 10, 9, 0, 0)
+            EndAt = new DateTime(2026, 7, 10, 9, 0, 0),
+            TotalSeats = 100
         };
 
         var results = Validate(eventItem);
@@ -83,7 +87,8 @@ public class EventValidationTests
         {
             Title = "Встреча",
             StartAt = moment,
-            EndAt = moment
+            EndAt = moment, 
+            TotalSeats = 100
         };
 
         var results = Validate(eventItem);
