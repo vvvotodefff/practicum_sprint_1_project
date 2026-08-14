@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc;
 using ProjectWork.Exceptions;
 
 namespace ProjectWork.Middleware
@@ -31,6 +32,8 @@ namespace ProjectWork.Middleware
             var (statusCode, title) = exception switch
             {
                 NotFoundException => (StatusCodes.Status404NotFound, "Ресурс не найден"),
+                NoAvailableSeatsException => (StatusCodes.Status409Conflict, "Нет свободных мест"),
+                ValidationException => (StatusCodes.Status400BadRequest, "Ошибка валидации"),
                 ArgumentException => (StatusCodes.Status400BadRequest, "Некорректный запрос"),
                 _ => (StatusCodes.Status500InternalServerError, "Внутренняя ошибка сервера")
             };
