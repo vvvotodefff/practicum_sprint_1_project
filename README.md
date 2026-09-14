@@ -51,6 +51,43 @@
 
 Swagger UI доступен по адресу `http://localhost:5259/swagger`.
 
+## Подготовка к пятому спринту (этапы 1–2)
+
+Используется `docker-compose.yml` из материалов курса: образ `postgres:16-alpine`,
+контейнер `eventapi-postgres`. Единственная настройка окружения, отличающаяся от
+приложенного файла, — публикация порта `127.0.0.1:5433:5432`.
+Для локальной базы необходим запущенный Docker Desktop с Linux-контейнерами.
+Из корня проекта выполните:
+
+```bash
+docker compose up -d --wait postgres
+docker compose ps
+```
+
+PostgreSQL 16 доступен на `localhost:5433`: база `eventapi`, пользователь
+`postgres`, пароль `postgres`. Это учётные данные только для локальной разработки.
+Порт хоста — `5433`, чтобы не конфликтовать с уже установленным PostgreSQL на `5432`.
+Внутри контейнера PostgreSQL использует стандартный порт `5432`.
+
+Строка подключения для последующих этапов:
+
+```text
+Host=localhost;Port=5433;Database=eventapi;Username=postgres;Password=postgres
+```
+
+Остановка базы без удаления данных:
+
+```bash
+docker compose stop postgres
+```
+
+Данные базы сохраняются в именованном томе `eventapi_pgdata`
+(при стандартном имени Compose-проекта — `projectwork_eventapi_pgdata`).
+В основной проект добавлены `Microsoft.EntityFrameworkCore` и
+`Npgsql.EntityFrameworkCore.PostgreSQL`, в тестовый — `Microsoft.EntityFrameworkCore.InMemory`.
+На этом этапе API и существующие тесты ещё используют прежнее хранение в памяти:
+подключение `AppDbContext`, создание таблиц и переход сервисов на EF Core выполняются далее.
+
 ## API
 
 | Метод | Маршрут | Описание | Успешный ответ |
