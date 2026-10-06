@@ -1,134 +1,126 @@
+using Microsoft.EntityFrameworkCore;
+using ProjectWork.DataAccess;
 using ProjectWork.DTO;
 using ProjectWork.Exceptions;
 using ProjectWork.Models;
 
 namespace ProjectWork.Services;
 
-public class EventService : IEventService
+public class EventService(AppDbContext context) : IEventService
 {
-    private readonly List<Event> Events = [];
-
-    // Со списком событий одновременно работают веб-запросы и фоновая обработка броней,
-    // поэтому любое чтение и изменение выполняется под блокировкой
-    private readonly object _eventLock = new();
-
-    public PaginatedResult<Event> GetEvents(string? title, DateTime? from, DateTime? to, int page, int pageSize)
+    public async Task<PaginatedResult<Event>> GetEventsAsync(string? title, DateTime? from,
+        DateTime? to, int page, int pageSize, CancellationToken cancellationToken = default)
     {
-        lock (_eventLock)
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(page);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
+        var query = context.Events.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(title))
         {
-            IEnumerable<Event> filteredEvents = Events;
-
-            if (!string.IsNullOrWhiteSpace(title))
-            {
-                filteredEvents = filteredEvents.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
-            }
-
-            if (from != null)
-            {
-                filteredEvents = filteredEvents.Where(e => e.StartAt >= from);
-            }
-
-            if (to != null)
-            {
-                filteredEvents = filteredEvents.Where(e => e.EndAt <= to);
-            }
-
-            var totalCount = filteredEvents.Count();
-
-            var items = filteredEvents
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToList();
-
-            return new PaginatedResult<Event>
-            {
-                TotalCount = totalCount,
-                Page = page,
-                PageSize = pageSize,
-                Items = items
-            };
+            var search = title.ToLower();
+            query = query.Where(e => e.Title.ToLower().Contains(search));
         }
-    }
-
-    public Event? GetEventById(Guid id)
-    {
-        lock (_eventLock)
+        if (from.HasValue)
         {
-            return Events.FirstOrDefault(e => e.Id == id);
+            var start = Event.ToUtc(from.Value);
+            query = query.Where(e => e.StartAt >= start);
         }
-    }
-
-    public Task<EventInfo> CreateEventAsync(CreateEvent request)
-    {
-        // Фабрика проверяет данные, выдаёт Id и делает все места свободными
-        var eventItem = Event.Create(
-            request.Title,
-            request.Description,
-            request.StartAt,
-            request.EndAt,
-            request.TotalSeats ?? 0);
-
-        lock (_eventLock)
+        if (to.HasValue)
         {
-            Events.Add(eventItem);
+            var end = Event.ToUtc(to.Value);
+            query = query.Where(e => e.EndAt <= end);
         }
 
-        return Task.FromResult(EventInfo.FromEvent(eventItem));
+        var totalCount = await query.CountAsync(cancellationToken);
+        var offset = (long)(page - 1) * pageSize;
+        var items = offset >= totalCount
+            ? new List<Event>()
+            : await query.OrderBy(e => e.StartAt).ThenBy(e => e.Id)
+                .Skip((int)offset).Take(pageSize).ToListAsync(cancellationToken);
+        return new PaginatedResult<Event>
+        {
+            TotalCount = totalCount, Page = page, PageSize = pageSize, Items = items
+        };
     }
 
-    public bool UpdateEvent(Guid id, UpdateEvent request)
+    public Task<Event?> GetEventByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        context.Events.AsNoTracking().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
+
+    public async Task<EventInfo> CreateEventAsync(CreateEvent request, CancellationToken cancellationToken = default)
     {
-        lock (_eventLock)
+        var eventItem = Event.Create(request.Title, request.Description,
+            request.StartAt, request.EndAt, request.TotalSeats ?? 0);
+        context.Events.Add(eventItem);
+        await context.SaveChangesAsync(cancellationToken);
+        return EventInfo.FromEvent(eventItem);
+    }
+
+    public async Task<bool> UpdateEventAsync(Guid id, UpdateEvent request,
+        CancellationToken cancellationToken = default)
+    {
+        await EventWriteLock.Gate.WaitAsync(cancellationToken);
+        try
         {
-            var existingEvent = Events.FirstOrDefault(e => e.Id == id);
-
-            if (existingEvent is null)
-                return false;
-
-            // Сущность сама проверит данные и пересчитает свободные места
-            existingEvent.Update(
-                request.Title,
-                request.Description,
-                request.StartAt,
-                request.EndAt,
-                request.TotalSeats ?? 0);
-
+            var eventItem = await FindForUpdateAsync(id, cancellationToken);
+            if (eventItem is null) return false;
+            eventItem.Update(request.Title, request.Description, request.StartAt,
+                request.EndAt, request.TotalSeats ?? 0);
+            await context.SaveChangesAsync(cancellationToken);
             return true;
         }
+        finally { EventWriteLock.Gate.Release(); }
     }
 
-    public bool DeleteEvent(Guid id)
+    public async Task<bool> DeleteEventAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        lock (_eventLock)
+        await EventWriteLock.Gate.WaitAsync(cancellationToken);
+        try
         {
-            var eventItem = Events.FirstOrDefault(e => e.Id == id);
-
-            if (eventItem is null)
-                return false;
-
-            Events.Remove(eventItem);
+            var eventItem = await FindForUpdateAsync(id, cancellationToken);
+            if (eventItem is null) return false;
+            // Явная загрузка позволяет проверить каскадное удаление и с InMemory.
+            await context.Entry(eventItem).Collection(e => e.Bookings).LoadAsync(cancellationToken);
+            context.Events.Remove(eventItem);
+            await context.SaveChangesAsync(cancellationToken);
             return true;
         }
+        finally { EventWriteLock.Gate.Release(); }
     }
 
-    public bool TryReserveSeats(Guid eventId, int count = 1)
+    public async Task<bool> TryReserveSeatsAsync(Guid eventId, int count = 1,
+        CancellationToken cancellationToken = default)
     {
-        // Поиск события и занятие места — одна неделимая операция
-        lock (_eventLock)
+        await EventWriteLock.Gate.WaitAsync(cancellationToken);
+        try
         {
-            var eventItem = Events.FirstOrDefault(e => e.Id == eventId)
+            var eventItem = await FindForUpdateAsync(eventId, cancellationToken)
                 ?? throw new NotFoundException($"Событие с идентификатором '{eventId}' не найдено.");
-
-            return eventItem.TryReserveSeats(count);
+            if (!eventItem.TryReserveSeats(count)) return false;
+            await context.SaveChangesAsync(cancellationToken);
+            return true;
         }
+        finally { EventWriteLock.Gate.Release(); }
     }
 
-    public void ReleaseSeats(Guid eventId, int count = 1)
+    public async Task ReleaseSeatsAsync(Guid eventId, int count = 1,
+        CancellationToken cancellationToken = default)
     {
-        lock (_eventLock)
+        await EventWriteLock.Gate.WaitAsync(cancellationToken);
+        try
         {
-            // Событие могли удалить — возвращать место некуда, это не ошибка
-            Events.FirstOrDefault(e => e.Id == eventId)?.ReleaseSeats(count);
+            var eventItem = await FindForUpdateAsync(eventId, cancellationToken);
+            if (eventItem is null) return;
+            eventItem.ReleaseSeats(count);
+            await context.SaveChangesAsync(cancellationToken);
         }
+        finally { EventWriteLock.Gate.Release(); }
+    }
+
+    private async Task<Event?> FindForUpdateAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var eventItem = await context.Events.SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
+        // При повторном вызове в одном scope обновляем ранее отслеживаемый экземпляр.
+        if (eventItem is not null)
+            await context.Entry(eventItem).ReloadAsync(cancellationToken);
+        return eventItem;
     }
 }

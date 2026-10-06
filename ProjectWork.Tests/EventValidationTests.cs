@@ -15,16 +15,17 @@ public class EventValidationTests
         return results;
     }
 
+    private static Event NewEvent() => Event.Create("Встреча", null,
+        new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0), 100);
+
     [Fact]
     public void Validate_CorrectEvent_PassesValidation()
     {
-        var eventItem = new Event
-        {
-            Title = "Встреча",
-            StartAt = new DateTime(2026, 7, 10, 9, 0, 0),
-            EndAt = new DateTime(2026, 7, 10, 10, 0, 0),
-            TotalSeats = 100
-        };
+        var eventItem = NewEvent();
+        eventItem.Title = "Встреча";
+        eventItem.StartAt = new DateTime(2026, 7, 10, 9, 0, 0);
+        eventItem.EndAt = new DateTime(2026, 7, 10, 10, 0, 0);
+        eventItem.TotalSeats = 100;
 
         var results = Validate(eventItem);
 
@@ -34,13 +35,11 @@ public class EventValidationTests
     [Fact]
     public void Validate_EmptyTitle_FailsValidation()
     {
-        var eventItem = new Event
-        {
-            Title = "",
-            StartAt = new DateTime(2026, 7, 10, 9, 0, 0),
-            EndAt = new DateTime(2026, 7, 10, 10, 0, 0), 
-            TotalSeats = 100
-        };
+        var eventItem = NewEvent();
+        eventItem.Title = "";
+        eventItem.StartAt = new DateTime(2026, 7, 10, 9, 0, 0);
+        eventItem.EndAt = new DateTime(2026, 7, 10, 10, 0, 0);
+        eventItem.TotalSeats = 100;
 
         var results = Validate(eventItem);
 
@@ -50,12 +49,11 @@ public class EventValidationTests
     [Fact]
     public void Validate_MissingDates_FailsValidation()
     {
-        var eventItem = new Event
-        {
-            Title = "Встреча",
-            TotalSeats = 100
-            // StartAt и EndAt не заданы — остаются default
-        };
+        var eventItem = NewEvent();
+        eventItem.Title = "Встреча";
+        eventItem.TotalSeats = 100;
+        eventItem.StartAt = default;
+        eventItem.EndAt = default;
 
         var results = Validate(eventItem);
 
@@ -66,13 +64,11 @@ public class EventValidationTests
     [Fact]
     public void Validate_EndAtBeforeStartAt_FailsValidation()
     {
-        var eventItem = new Event
-        {
-            Title = "Встреча",
-            StartAt = new DateTime(2026, 7, 10, 10, 0, 0),
-            EndAt = new DateTime(2026, 7, 10, 9, 0, 0),
-            TotalSeats = 100
-        };
+        var eventItem = NewEvent();
+        eventItem.Title = "Встреча";
+        eventItem.StartAt = new DateTime(2026, 7, 10, 10, 0, 0);
+        eventItem.EndAt = new DateTime(2026, 7, 10, 9, 0, 0);
+        eventItem.TotalSeats = 100;
 
         var results = Validate(eventItem);
 
@@ -83,13 +79,11 @@ public class EventValidationTests
     public void Validate_EndAtEqualsStartAt_FailsValidation()
     {
         var moment = new DateTime(2026, 7, 10, 9, 0, 0);
-        var eventItem = new Event
-        {
-            Title = "Встреча",
-            StartAt = moment,
-            EndAt = moment, 
-            TotalSeats = 100
-        };
+        var eventItem = NewEvent();
+        eventItem.Title = "Встреча";
+        eventItem.StartAt = moment;
+        eventItem.EndAt = moment;
+        eventItem.TotalSeats = 100;
 
         var results = Validate(eventItem);
 

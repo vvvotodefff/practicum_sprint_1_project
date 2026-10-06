@@ -1,135 +1,70 @@
-using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
+using ProjectWork.DataAccess;
 using ProjectWork.Exceptions;
 using ProjectWork.Models;
 
 namespace ProjectWork.Services;
 
-/// <summary>
-/// Сервис для работы с бронированиями
-/// </summary>
-public class BookingService : IBookingService
+public class BookingService(AppDbContext context) : IBookingService
 {
-    // Потокобезопасное хранилище: чтение и добавление не требуют блокировки
-    private readonly ConcurrentDictionary<Guid, Booking> Bookings = new();
+    public Task<List<Booking>> GetBookingsAsync(CancellationToken cancellationToken = default) =>
+        context.Bookings.AsNoTracking().ToListAsync(cancellationToken);
 
-    // Замок нужен только для атомарной пары «проверить места + создать бронь»
-    private readonly object _bookingLock = new();
+    public Task<Booking?> GetBookingByIdAsync(Guid bookingId, CancellationToken cancellationToken = default) =>
+        context.Bookings.AsNoTracking().SingleOrDefaultAsync(b => b.Id == bookingId, cancellationToken);
 
-    private readonly IEventService _eventService;
+    public Task<List<Booking>> GetPendingBookingsAsync(CancellationToken cancellationToken = default) =>
+        context.Bookings.AsNoTracking().Where(b => b.Status == BookingStatus.Pending)
+            .ToListAsync(cancellationToken);
 
-    /// <summary>
-    /// Создаёт сервис бронирований
-    /// </summary>
-    public BookingService(IEventService eventService)
+    public async Task<Booking> CreateBookingAsync(Guid eventId, CancellationToken cancellationToken = default)
     {
-        _eventService = eventService;
-    }
-
-    /// <summary>
-    /// Получить все брони
-    /// </summary>
-    /// <returns></returns>
-    public List<Booking> GetBookings()
-    {
-        return Bookings.Values.ToList();
-    }
-
-    /// <summary>
-    /// Получить бронь по идентификатору. Возвращает null, если бронь не найдена
-    /// </summary>
-    /// <param name="id"></param>
-    /// <returns></returns>
-    private Booking? GetBookingById(Guid id)
-    {
-        return Bookings.TryGetValue(id, out var booking) ? booking : null;
-    }
-
-    /// <summary>
-    /// Создать бронь для события: присваивает новый идентификатор
-    /// </summary>
-    /// <param name="eventId"></param>
-    /// <returns></returns>
-    private Booking AddBooking(Guid eventId)
-    {
-        var booking = new Booking
+        await EventWriteLock.Gate.WaitAsync(cancellationToken);
+        try
         {
-            Id = Guid.NewGuid(),
-            EventId = eventId,
-            Status = BookingStatus.Pending,
-            CreatedAt = DateTime.UtcNow,
-            ProcessedAt = null
-        };
-
-        Bookings[booking.Id] = booking;
-
-        return booking;
-    }
-
-    /// <summary>
-    /// Создать бронь для события: занимает место и сохраняет бронь.
-    /// Бросает <see cref="NoAvailableSeatsException"/>, если свободных мест нет
-    /// </summary>
-    /// <param name="eventId"></param>
-    /// <returns></returns>
-    public Task<Booking> CreateBookingAsync(Guid eventId)
-    {
-        // Критическая секция: занятие места и создание брони
-        // выполняются целиком, без вмешательства других потоков.
-        // Порядок захвата всегда один: сначала замок броней, потом замок событий
-        lock (_bookingLock)
-        {
-            // Событие ищет и занимает место сам EventService — под своей блокировкой.
-            // Если события нет, оттуда прилетит NotFoundException
-            if (!_eventService.TryReserveSeats(eventId))
+            var eventItem = await context.Events.SingleOrDefaultAsync(e => e.Id == eventId, cancellationToken)
+                ?? throw new NotFoundException($"Событие с идентификатором '{eventId}' не найдено.");
+            await context.Entry(eventItem).ReloadAsync(cancellationToken);
+            if (!eventItem.TryReserveSeats())
                 throw new NoAvailableSeatsException("No available seats for this event");
 
-            return Task.FromResult(AddBooking(eventId));
+            var booking = Booking.Create(eventId);
+            context.Bookings.Add(booking);
+            // PostgreSQL сохраняет бронь и уменьшение мест одной транзакцией.
+            await context.SaveChangesAsync(cancellationToken);
+            return booking;
         }
+        finally { EventWriteLock.Gate.Release(); }
     }
 
-    /// <summary>
-    /// Асинхронно получить бронь по идентификатору. Возвращает null, если бронь не найдена
-    /// </summary>
-    /// <param name="id"></param>
-    /// <returns></returns>
-    public Task<Booking?> GetBookingByIdAsync(Guid id)
+    public async Task<bool> MarkAsProcessedAsync(Guid bookingId, BookingStatus status,
+        CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(GetBookingById(id));
-    }
-
-    /// <summary>
-    /// Получить брони, ожидающие обработки (статус Pending)
-    /// </summary>
-    /// <returns>Копия списка</returns>
-    public List<Booking> GetPendingBookings()
-    {
-        return Bookings.Values.Where(b => b.Status == BookingStatus.Pending).ToList();
-    }
-
-    /// <summary>
-    /// Перевести бронь в указанный статус и проставить время обработки
-    /// </summary>
-    /// <param name="bookingId">Идентификатор брони</param>
-    /// <param name="status">Новый статус брони</param>
-    /// <returns>false, если бронь с таким идентификатором не найдена</returns>
-    public bool MarkAsProcessed(Guid bookingId, BookingStatus status)
-    {
-        if (!Bookings.TryGetValue(bookingId, out var booking))
-            return false;
-
-        switch (status)
+        if (status is not (BookingStatus.Confirmed or BookingStatus.Rejected)) return false;
+        await EventWriteLock.Gate.WaitAsync(cancellationToken);
+        try
         {
-            case BookingStatus.Confirmed:
-                booking.Confirm();
-                return true;
+            var booking = await context.Bookings.SingleOrDefaultAsync(b => b.Id == bookingId, cancellationToken);
+            if (booking is null) return false;
+            await context.Entry(booking).ReloadAsync(cancellationToken);
+            // Повторная обработка не должна второй раз возвращать место.
+            if (booking.Status != BookingStatus.Pending) return false;
 
-            case BookingStatus.Rejected:
+            if (status == BookingStatus.Rejected)
+            {
+                var eventItem = await context.Events.SingleAsync(e => e.Id == booking.EventId, cancellationToken);
+                await context.Entry(eventItem).ReloadAsync(cancellationToken);
                 booking.Reject();
-                return true;
+                eventItem.ReleaseSeats();
+            }
+            else
+            {
+                booking.Confirm();
+            }
 
-            // Pending — не результат обработки, такой переход не поддерживаем
-            default:
-                return false;
+            await context.SaveChangesAsync(cancellationToken);
+            return true;
         }
+        finally { EventWriteLock.Gate.Release(); }
     }
 }

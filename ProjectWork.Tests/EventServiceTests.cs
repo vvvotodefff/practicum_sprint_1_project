@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.ComponentModel.DataAnnotations;
 using ProjectWork.DTO;
 using ProjectWork.Exceptions;
@@ -6,9 +7,23 @@ using ProjectWork.Services;
 
 namespace ProjectWork.Tests;
 
-public class EventServiceTests
+public class EventServiceTests : IDisposable
 {
-    private readonly EventService _service = new();
+    private readonly TestDatabase _database = new();
+    private readonly IServiceScope _scope;
+    private readonly IEventService _service;
+
+    public EventServiceTests()
+    {
+        _scope = _database.CreateScope();
+        _service = _scope.ServiceProvider.GetRequiredService<IEventService>();
+    }
+
+    public void Dispose()
+    {
+        _scope.Dispose();
+        _database.Dispose();
+    }
 
     private static CreateEvent NewRequest(string title, DateTime startAt, DateTime endAt, int totalSeats = 100) => new()
     {
@@ -31,7 +46,7 @@ public class EventServiceTests
         return await _service.CreateEventAsync(NewRequest(title, startAt, endAt, totalSeats));
     }
 
-    private PaginatedResult<Event> GetAll() => _service.GetEvents(null, null, null, 1, 100);
+    private Task<PaginatedResult<Event>> GetAllAsync() => _service.GetEventsAsync(null, null, null, 1, 100);
 
     // ----- Успешные сценарии -----
 
@@ -41,7 +56,7 @@ public class EventServiceTests
         var created = await AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
 
         Assert.NotEqual(Guid.Empty, created.Id);
-        var stored = Assert.Single(GetAll().Items);
+        var stored = Assert.Single((await GetAllAsync()).Items);
         Assert.Equal("Встреча", stored.Title);
     }
 
@@ -62,7 +77,7 @@ public class EventServiceTests
         var request = NewRequest("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), totalSeats);
 
         await Assert.ThrowsAsync<ValidationException>(() => _service.CreateEventAsync(request));
-        Assert.Empty(GetAll().Items);
+        Assert.Empty((await GetAllAsync()).Items);
     }
 
     [Fact]
@@ -80,7 +95,7 @@ public class EventServiceTests
         await AddEvent("Второе", new DateTime(2026, 7, 2, 9, 0, 0), new DateTime(2026, 7, 2, 10, 0, 0));
         await AddEvent("Третье", new DateTime(2026, 7, 3, 9, 0, 0), new DateTime(2026, 7, 3, 10, 0, 0));
 
-        var result = GetAll();
+        var result = await GetAllAsync();
 
         Assert.Equal(3, result.TotalCount);
         Assert.Equal(3, result.Items.Count);
@@ -91,7 +106,7 @@ public class EventServiceTests
     {
         var added = await AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
 
-        var found = _service.GetEventById(added.Id);
+        var found = await _service.GetEventByIdAsync(added.Id);
 
         Assert.NotNull(found);
         Assert.Equal(added.Id, found.Id);
@@ -105,10 +120,10 @@ public class EventServiceTests
         var newData = NewUpdate("Новое название", new DateTime(2026, 7, 11, 12, 0, 0), new DateTime(2026, 7, 11, 13, 0, 0));
         newData.Description = "Обновлённое описание";
 
-        var updated = _service.UpdateEvent(added.Id, newData);
+        var updated = await _service.UpdateEventAsync(added.Id, newData);
 
         Assert.True(updated);
-        var stored = _service.GetEventById(added.Id);
+        var stored = await _service.GetEventByIdAsync(added.Id);
         Assert.NotNull(stored);
         Assert.Equal("Новое название", stored.Title);
         Assert.Equal("Обновлённое описание", stored.Description);
@@ -121,11 +136,11 @@ public class EventServiceTests
     {
         var added = await AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
 
-        var deleted = _service.DeleteEvent(added.Id);
+        var deleted = await _service.DeleteEventAsync(added.Id);
 
         Assert.True(deleted);
-        Assert.Null(_service.GetEventById(added.Id));
-        Assert.Empty(GetAll().Items);
+        Assert.Null((await _service.GetEventByIdAsync(added.Id)));
+        Assert.Empty((await GetAllAsync()).Items);
     }
 
     [Fact]
@@ -135,7 +150,7 @@ public class EventServiceTests
         await AddEvent("встреча с заказчиком", new DateTime(2026, 7, 20, 15, 0, 0), new DateTime(2026, 7, 20, 16, 0, 0));
         await AddEvent("Отпуск", new DateTime(2026, 8, 1, 0, 0, 0), new DateTime(2026, 8, 15, 0, 0, 0));
 
-        var result = _service.GetEvents("ВСТРЕЧА", null, null, 1, 100);
+        var result = await _service.GetEventsAsync("ВСТРЕЧА", null, null, 1, 100);
 
         Assert.Equal(2, result.TotalCount);
         Assert.All(result.Items, e => Assert.Contains("встреча", e.Title, StringComparison.OrdinalIgnoreCase));
@@ -148,7 +163,7 @@ public class EventServiceTests
         await AddEvent("Граничное", new DateTime(2026, 7, 15, 0, 0, 0), new DateTime(2026, 7, 15, 1, 0, 0));
         await AddEvent("Позднее", new DateTime(2026, 7, 20, 9, 0, 0), new DateTime(2026, 7, 20, 10, 0, 0));
 
-        var result = _service.GetEvents(null, new DateTime(2026, 7, 15, 0, 0, 0), null, 1, 100);
+        var result = await _service.GetEventsAsync(null, new DateTime(2026, 7, 15, 0, 0, 0), null, 1, 100);
 
         Assert.Equal(2, result.TotalCount);
         Assert.DoesNotContain(result.Items, e => e.Title == "Раннее");
@@ -161,7 +176,7 @@ public class EventServiceTests
         await AddEvent("Граничное", new DateTime(2026, 7, 14, 23, 0, 0), new DateTime(2026, 7, 15, 0, 0, 0));
         await AddEvent("Позднее", new DateTime(2026, 7, 20, 9, 0, 0), new DateTime(2026, 7, 20, 10, 0, 0));
 
-        var result = _service.GetEvents(null, null, new DateTime(2026, 7, 15, 0, 0, 0), 1, 100);
+        var result = await _service.GetEventsAsync(null, null, new DateTime(2026, 7, 15, 0, 0, 0), 1, 100);
 
         Assert.Equal(2, result.TotalCount);
         Assert.DoesNotContain(result.Items, e => e.Title == "Позднее");
@@ -175,7 +190,7 @@ public class EventServiceTests
             await AddEvent($"Событие {day:00}", new DateTime(2026, 7, day, 9, 0, 0), new DateTime(2026, 7, day, 10, 0, 0));
         }
 
-        var result = _service.GetEvents(null, null, null, 2, 5);
+        var result = await _service.GetEventsAsync(null, null, null, 2, 5);
 
         Assert.Equal(12, result.TotalCount);
         Assert.Equal(2, result.Page);
@@ -190,7 +205,7 @@ public class EventServiceTests
     {
         await AddEvent("Единственное", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
 
-        var result = _service.GetEvents(null, null, null, 99, 10);
+        var result = await _service.GetEventsAsync(null, null, null, 99, 10);
 
         Assert.Equal(1, result.TotalCount);
         Assert.Empty(result.Items);
@@ -204,12 +219,12 @@ public class EventServiceTests
         await AddEvent("Встреча выпускников", new DateTime(2026, 8, 5, 18, 0, 0), new DateTime(2026, 8, 5, 21, 0, 0));
         await AddEvent("Отпуск", new DateTime(2026, 7, 21, 0, 0, 0), new DateTime(2026, 7, 25, 0, 0, 0));
 
-        var result = _service.GetEvents(
+        var result = (await _service.GetEventsAsync(
             "встреча",
             new DateTime(2026, 7, 15, 0, 0, 0),
             new DateTime(2026, 7, 31, 0, 0, 0),
             1,
-            100);
+            100));
 
         var found = Assert.Single(result.Items);
         Assert.Equal("встреча с заказчиком", found.Title);
@@ -223,17 +238,17 @@ public class EventServiceTests
     {
         await AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
 
-        var found = _service.GetEventById(Guid.NewGuid());
+        var found = await _service.GetEventByIdAsync(Guid.NewGuid());
 
         Assert.Null(found);
     }
 
     [Fact]
-    public void UpdateEvent_UnknownId_ReturnsFalse()
+    public async Task UpdateEvent_UnknownId_ReturnsFalse()
     {
         var newData = NewUpdate("Новое название", new DateTime(2026, 7, 11, 12, 0, 0), new DateTime(2026, 7, 11, 13, 0, 0));
 
-        var updated = _service.UpdateEvent(Guid.NewGuid(), newData);
+        var updated = await _service.UpdateEventAsync(Guid.NewGuid(), newData);
 
         Assert.False(updated);
     }
@@ -242,14 +257,14 @@ public class EventServiceTests
     public async Task UpdateEvent_ChangingTotalSeats_KeepsOccupiedSeats()
     {
         var added = await AddEvent("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 100);
-        _service.TryReserveSeats(added.Id, 40);
+        await _service.TryReserveSeatsAsync(added.Id, 40);
 
         // Зал расширили до 150 — занятые 40 мест должны сохраниться
-        var updated = _service.UpdateEvent(added.Id,
-            NewUpdate("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 150));
+        var updated = (await _service.UpdateEventAsync(added.Id,
+            NewUpdate("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 150)));
 
         Assert.True(updated);
-        var stored = _service.GetEventById(added.Id);
+        var stored = await _service.GetEventByIdAsync(added.Id);
         Assert.NotNull(stored);
         Assert.Equal(150, stored.TotalSeats);
         Assert.Equal(110, stored.AvailableSeats);
@@ -259,13 +274,13 @@ public class EventServiceTests
     public async Task UpdateEvent_TotalSeatsBelowOccupied_ThrowsValidationException()
     {
         var added = await AddEvent("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 10);
-        _service.TryReserveSeats(added.Id, 6);
+        await _service.TryReserveSeatsAsync(added.Id, 6);
 
-        Assert.Throws<ValidationException>(() => _service.UpdateEvent(added.Id,
+        await Assert.ThrowsAsync<ValidationException>(() => _service.UpdateEventAsync(added.Id,
             NewUpdate("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 5)));
 
         // Событие осталось нетронутым
-        var stored = _service.GetEventById(added.Id);
+        var stored = await _service.GetEventByIdAsync(added.Id);
         Assert.NotNull(stored);
         Assert.Equal(10, stored.TotalSeats);
         Assert.Equal(4, stored.AvailableSeats);
@@ -275,13 +290,13 @@ public class EventServiceTests
     public async Task UpdateEvent_DoesNotResetOccupiedSeats()
     {
         var added = await AddEvent("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 10);
-        _service.TryReserveSeats(added.Id, 3);
+        await _service.TryReserveSeatsAsync(added.Id, 3);
 
         // Клиент присылает те же 10 мест — свободных всё равно должно остаться 7
-        _service.UpdateEvent(added.Id,
+        await _service.UpdateEventAsync(added.Id,
             NewUpdate("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 10));
 
-        Assert.Equal(7, _service.GetEventById(added.Id)!.AvailableSeats);
+        Assert.Equal(7, (await _service.GetEventByIdAsync(added.Id))!.AvailableSeats);
     }
 
     [Fact]
@@ -289,18 +304,18 @@ public class EventServiceTests
     {
         await AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
 
-        var deleted = _service.DeleteEvent(Guid.NewGuid());
+        var deleted = await _service.DeleteEventAsync(Guid.NewGuid());
 
         Assert.False(deleted);
-        Assert.Single(GetAll().Items);
+        Assert.Single((await GetAllAsync()).Items);
     }
 
     // ----- Граничные случаи (edge cases) -----
 
     [Fact]
-    public void GetEvents_EmptyStorage_ReturnsEmptyResult()
+    public async Task GetEvents_EmptyStorage_ReturnsEmptyResult()
     {
-        var result = GetAll();
+        var result = await GetAllAsync();
 
         Assert.Equal(0, result.TotalCount);
         Assert.Empty(result.Items);
@@ -314,7 +329,7 @@ public class EventServiceTests
         await AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
         await AddEvent("Отпуск", new DateTime(2026, 8, 1, 0, 0, 0), new DateTime(2026, 8, 15, 0, 0, 0));
 
-        var result = _service.GetEvents(title, null, null, 1, 100);
+        var result = await _service.GetEventsAsync(title, null, null, 1, 100);
 
         Assert.Equal(2, result.TotalCount);
     }
@@ -324,7 +339,7 @@ public class EventServiceTests
     {
         await AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
 
-        var result = _service.GetEvents("абракадабра", null, null, 1, 100);
+        var result = await _service.GetEventsAsync("абракадабра", null, null, 1, 100);
 
         Assert.Equal(0, result.TotalCount);
         Assert.Empty(result.Items);
@@ -338,7 +353,7 @@ public class EventServiceTests
         await AddEvent("Граничное", startAt, endAt);
 
         // Границы диапазона совпадают с датами события — сравнение нестрогое
-        var result = _service.GetEvents(null, startAt, endAt, 1, 100);
+        var result = await _service.GetEventsAsync(null, startAt, endAt, 1, 100);
 
         var found = Assert.Single(result.Items);
         Assert.Equal("Граничное", found.Title);
@@ -349,7 +364,7 @@ public class EventServiceTests
     {
         await AddEvent("Встреча", new DateTime(2026, 7, 10, 9, 0, 0), new DateTime(2026, 7, 10, 10, 0, 0));
 
-        var result = _service.GetEvents(null, new DateTime(2026, 8, 1, 0, 0, 0), new DateTime(2026, 7, 1, 0, 0, 0), 1, 100);
+        var result = await _service.GetEventsAsync(null, new DateTime(2026, 8, 1, 0, 0, 0), new DateTime(2026, 7, 1, 0, 0, 0), 1, 100);
 
         Assert.Equal(0, result.TotalCount);
         Assert.Empty(result.Items);
@@ -363,7 +378,7 @@ public class EventServiceTests
             await AddEvent($"Событие {day:00}", new DateTime(2026, 7, day, 9, 0, 0), new DateTime(2026, 7, day, 10, 0, 0));
         }
 
-        var result = _service.GetEvents(null, null, null, 3, 5);
+        var result = await _service.GetEventsAsync(null, null, null, 3, 5);
 
         Assert.Equal(12, result.TotalCount);
         Assert.Equal(2, result.Items.Count);
@@ -377,7 +392,7 @@ public class EventServiceTests
         await AddEvent("Первое", new DateTime(2026, 7, 1, 9, 0, 0), new DateTime(2026, 7, 1, 10, 0, 0));
         await AddEvent("Второе", new DateTime(2026, 7, 2, 9, 0, 0), new DateTime(2026, 7, 2, 10, 0, 0));
 
-        var result = _service.GetEvents(null, null, null, 1, 100);
+        var result = await _service.GetEventsAsync(null, null, null, 1, 100);
 
         Assert.Equal(2, result.TotalCount);
         Assert.Equal(2, result.Items.Count);
@@ -413,10 +428,10 @@ public class EventServiceTests
     {
         var created = await AddEvent("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 5);
 
-        var reserved = _service.TryReserveSeats(created.Id, 2);
+        var reserved = await _service.TryReserveSeatsAsync(created.Id, 2);
 
         Assert.True(reserved);
-        Assert.Equal(3, _service.GetEventById(created.Id)!.AvailableSeats);
+        Assert.Equal(3, (await _service.GetEventByIdAsync(created.Id))!.AvailableSeats);
     }
 
     [Fact]
@@ -424,32 +439,32 @@ public class EventServiceTests
     {
         var created = await AddEvent("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 1);
 
-        Assert.False(_service.TryReserveSeats(created.Id, 2));
-        Assert.Equal(1, _service.GetEventById(created.Id)!.AvailableSeats);
+        Assert.False((await _service.TryReserveSeatsAsync(created.Id, 2)));
+        Assert.Equal(1, (await _service.GetEventByIdAsync(created.Id))!.AvailableSeats);
     }
 
     [Fact]
-    public void Service_TryReserveSeats_UnknownEvent_ThrowsNotFound()
+    public async Task Service_TryReserveSeats_UnknownEvent_ThrowsNotFound()
     {
-        Assert.Throws<NotFoundException>(() => _service.TryReserveSeats(Guid.NewGuid()));
+        await Assert.ThrowsAsync<NotFoundException>(() => _service.TryReserveSeatsAsync(Guid.NewGuid()));
     }
 
     [Fact]
     public async Task Service_ReleaseSeats_ReturnsSeatToPool()
     {
         var created = await AddEvent("Концерт", new DateTime(2026, 9, 1, 19, 0, 0), new DateTime(2026, 9, 1, 22, 0, 0), 5);
-        _service.TryReserveSeats(created.Id, 3);
+        await _service.TryReserveSeatsAsync(created.Id, 3);
 
-        _service.ReleaseSeats(created.Id, 2);
+        await _service.ReleaseSeatsAsync(created.Id, 2);
 
-        Assert.Equal(4, _service.GetEventById(created.Id)!.AvailableSeats);
+        Assert.Equal(4, (await _service.GetEventByIdAsync(created.Id))!.AvailableSeats);
     }
 
     [Fact]
-    public void Service_ReleaseSeats_UnknownEvent_DoesNothing()
+    public async Task Service_ReleaseSeats_UnknownEvent_DoesNothing()
     {
         // Событие могли удалить — компенсация не должна падать
-        _service.ReleaseSeats(Guid.NewGuid());
+        await _service.ReleaseSeatsAsync(Guid.NewGuid());
     }
 
     [Fact]

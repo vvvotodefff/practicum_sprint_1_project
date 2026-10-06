@@ -1,31 +1,35 @@
-﻿using ProjectWork.DTO;
+using ProjectWork.DTO;
 using ProjectWork.Models;
 
 namespace ProjectWork.Services;
 
+/// <summary>Асинхронные операции с событиями и количеством свободных мест.</summary>
 public interface IEventService
 {
-    PaginatedResult<Event> GetEvents(string? title, DateTime? from, DateTime? to, int page, int pageSize);
-    Event? GetEventById(Guid id);
+    /// <summary>Получить страницу событий с фильтрами по названию и датам.</summary>
+    Task<PaginatedResult<Event>> GetEventsAsync(string? title, DateTime? from, DateTime? to,
+        int page, int pageSize, CancellationToken cancellationToken = default);
+
+    /// <summary>Получить событие по идентификатору или null, если его нет.</summary>
+    Task<Event?> GetEventByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Создать событие из данных запроса. Бросает ValidationException, если данные некорректны
+    /// Создать событие из данных запроса. Бросает ValidationException, если данные некорректны.
     /// </summary>
-    Task<EventInfo> CreateEventAsync(CreateEvent request);
-    /// <summary>
-    /// Обновить событие. Свободные места пересчитываются сервером
-    /// </summary>
-    bool UpdateEvent(Guid id, UpdateEvent request);
-    bool DeleteEvent(Guid id);
+    Task<EventInfo> CreateEventAsync(CreateEvent request, CancellationToken cancellationToken = default);
+
+    /// <summary>Обновить событие. Свободные места пересчитываются сервером.</summary>
+    Task<bool> UpdateEventAsync(Guid id, UpdateEvent request, CancellationToken cancellationToken = default);
+
+    /// <summary>Удалить событие и его брони. Возвращает false, если события нет.</summary>
+    Task<bool> DeleteEventAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Занять места на событии. Возвращает false, если свободных мест не хватает.
-    /// Бросает NotFoundException, если события нет
+    /// Бросает NotFoundException, если события нет.
     /// </summary>
-    bool TryReserveSeats(Guid eventId, int count = 1);
+    Task<bool> TryReserveSeatsAsync(Guid eventId, int count = 1, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Вернуть места в пул. Если события уже нет, ничего не делает
-    /// </summary>
-    void ReleaseSeats(Guid eventId, int count = 1);
+    /// <summary>Вернуть места в пул. Если события уже нет, ничего не делает.</summary>
+    Task ReleaseSeatsAsync(Guid eventId, int count = 1, CancellationToken cancellationToken = default);
 }

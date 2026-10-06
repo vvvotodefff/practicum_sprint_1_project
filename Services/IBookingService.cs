@@ -2,39 +2,30 @@ using ProjectWork.Models;
 
 namespace ProjectWork.Services;
 
-/// <summary>
-/// Хранилище бронирований
-/// </summary>
+/// <summary>Асинхронное создание, чтение и обработка бронирований.</summary>
 public interface IBookingService
 {
-    /// <summary>
-    /// Получить все брони
-    /// </summary>
-    List<Booking> GetBookings();
+    /// <summary>Получить все брони.</summary>
+    Task<List<Booking>> GetBookingsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Создать бронь для события: присваивает новый идентификатор,
-    /// статус <see cref="BookingStatus.Pending"/> и текущее время создания
+    /// статус <see cref="BookingStatus.Pending"/> и текущее время создания.
+    /// Бронь и уменьшение свободных мест сохраняются вместе.
     /// </summary>
-    /// <param name="eventId">Идентификатор события</param>
-    Task<Booking> CreateBookingAsync(Guid eventId);
+    Task<Booking> CreateBookingAsync(Guid eventId, CancellationToken cancellationToken = default);
+
+    /// <summary>Получить бронь по идентификатору или null, если она не найдена.</summary>
+    Task<Booking?> GetBookingByIdAsync(Guid bookingId, CancellationToken cancellationToken = default);
+
+    /// <summary>Получить брони, ожидающие обработки (статус <see cref="BookingStatus.Pending"/>).</summary>
+    Task<List<Booking>> GetPendingBookingsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Получить бронь по идентификатору. Возвращает null, если бронь не найдена
+    /// Подтвердить или отклонить ожидающую бронь и проставить время обработки.
+    /// При отклонении возвращает место. Возвращает false, если брони нет,
+    /// она уже обработана или передан неокончательный статус.
     /// </summary>
-    /// <param name="bookingId">Идентификатор брони</param>
-    Task<Booking?> GetBookingByIdAsync(Guid bookingId);
-
-    /// <summary>
-    /// Получить брони, ожидающие обработки (статус <see cref="BookingStatus.Pending"/>)
-    /// </summary>
-    List<Booking> GetPendingBookings();
-
-    /// <summary>
-    /// Перевести бронь в указанный статус и проставить время обработки.
-    /// Возвращает false, если бронь не найдена
-    /// </summary>
-    /// <param name="bookingId">Идентификатор брони</param>
-    /// <param name="status">Новый статус брони</param>
-    bool MarkAsProcessed(Guid bookingId, BookingStatus status);
+    Task<bool> MarkAsProcessedAsync(Guid bookingId, BookingStatus status,
+        CancellationToken cancellationToken = default);
 }

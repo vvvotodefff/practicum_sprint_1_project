@@ -1,13 +1,19 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace ProjectWork.Models;
 
 public class Event : IValidatableObject
 {
+    private Event() { }
+
+    [JsonIgnore]
+    public ICollection<Booking> Bookings { get; private set; } = new List<Booking>();
+
     public Guid Id { get; set; }
 
     [Required(ErrorMessage = "Название обязательно для заполнения")]
-    public required string Title { get; set; }
+    public string Title { get; set; } = null!;
 
     public string? Description { get; set; }
 
@@ -15,7 +21,7 @@ public class Event : IValidatableObject
 
     public DateTime EndAt { get; set; }
 
-    public required int TotalSeats { get; set; }
+    public int TotalSeats { get; set; }
 
     public int AvailableSeats { get; set; }
 
@@ -29,7 +35,9 @@ public class Event : IValidatableObject
     public static Event Create(string title, string? description,
         DateTime startAt, DateTime endAt, int totalSeats)
     {
-        var errors = GetErrors(title, startAt, endAt, totalSeats).ToList();
+        startAt = ToUtc(startAt);
+        endAt = ToUtc(endAt);
+        var errors = GetErrors(title, description, startAt, endAt, totalSeats).ToList();
 
         if (errors.Count > 0)
             throw new ValidationException(string.Join(" ", errors.Select(e => e.Message)));
@@ -54,7 +62,9 @@ public class Event : IValidatableObject
     public void Update(string title, string? description,
         DateTime startAt, DateTime endAt, int totalSeats)
     {
-        var errors = GetErrors(title, startAt, endAt, totalSeats).ToList();
+        startAt = ToUtc(startAt);
+        endAt = ToUtc(endAt);
+        var errors = GetErrors(title, description, startAt, endAt, totalSeats).ToList();
 
         if (errors.Count > 0)
             throw new ValidationException(string.Join(" ", errors.Select(e => e.Message)));
@@ -75,7 +85,7 @@ public class Event : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        foreach (var (field, message) in GetErrors(Title, StartAt, EndAt, TotalSeats))
+        foreach (var (field, message) in GetErrors(Title, Description, StartAt, EndAt, TotalSeats))
         {
             yield return new ValidationResult(message, [field]);
         }
@@ -83,12 +93,18 @@ public class Event : IValidatableObject
 
     // Единый набор правил: используется и фабрикой Create, и валидацией модели
     private static IEnumerable<(string Field, string Message)> GetErrors(
-        string? title, DateTime startAt, DateTime endAt, int totalSeats)
+        string? title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
     {
         if (string.IsNullOrWhiteSpace(title))
         {
             yield return (nameof(Title), "Название обязательно для заполнения");
         }
+
+        if (title?.Length > 200)
+            yield return (nameof(Title), "Название не должно превышать 200 символов");
+
+        if (description?.Length > 2000)
+            yield return (nameof(Description), "Описание не должно превышать 2000 символов");
 
         if (startAt == default)
         {
@@ -113,8 +129,17 @@ public class Event : IValidatableObject
         }
     }
 
+    // Даты без смещения трактуются как UTC; локальные даты приводятся к UTC.
+    internal static DateTime ToUtc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Local => value.ToUniversalTime(),
+        DateTimeKind.Unspecified => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+        _ => value
+    };
+
     public bool TryReserveSeats(int count = 1)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
         if (AvailableSeats < count)
             return false;
         AvailableSeats -= count;
@@ -126,8 +151,8 @@ public class Event : IValidatableObject
     /// </summary>
     public void ReleaseSeats(int count = 1)
     {
-        AvailableSeats = Math.Min(AvailableSeats + count, TotalSeats);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
+        AvailableSeats = (int)Math.Min((long)AvailableSeats + count, TotalSeats);
     }
 
 }
-

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using ProjectWork.DTO;
 using ProjectWork.Exceptions;
 using ProjectWork.Models;
@@ -5,14 +6,24 @@ using ProjectWork.Services;
 
 namespace ProjectWork.Tests;
 
-public class BookingServiceTests
+public class BookingServiceTests : IDisposable
 {
-    private readonly EventService _eventService = new();
-    private readonly BookingService _service;
+    private readonly TestDatabase _database = new();
+    private readonly IServiceScope _scope;
+    private readonly IEventService _eventService;
+    private readonly IBookingService _service;
 
     public BookingServiceTests()
     {
-        _service = new BookingService(_eventService);
+        _scope = _database.CreateScope();
+        _eventService = _scope.ServiceProvider.GetRequiredService<IEventService>();
+        _service = _scope.ServiceProvider.GetRequiredService<IBookingService>();
+    }
+
+    public void Dispose()
+    {
+        _scope.Dispose();
+        _database.Dispose();
     }
 
     /// <summary>
@@ -57,7 +68,7 @@ public class BookingServiceTests
 
         var ids = new[] { first.Id, second.Id, third.Id };
         Assert.Equal(3, ids.Distinct().Count());
-        Assert.Equal(3, _service.GetBookings().Count);
+        Assert.Equal(3, (await _service.GetBookingsAsync()).Count);
     }
 
     [Fact]
@@ -67,7 +78,7 @@ public class BookingServiceTests
 
         var booking = await _service.CreateBookingAsync(eventItem.Id);
 
-        var stored = Assert.Single(_service.GetBookings());
+        var stored = Assert.Single((await _service.GetBookingsAsync()));
         Assert.Equal(booking.Id, stored.Id);
     }
 
@@ -94,7 +105,7 @@ public class BookingServiceTests
         var created = await _service.CreateBookingAsync(eventItem.Id);
         var before = DateTime.UtcNow;
 
-        var processed = _service.MarkAsProcessed(created.Id, status);
+        var processed = await _service.MarkAsProcessedAsync(created.Id, status);
 
         Assert.True(processed);
         var found = await _service.GetBookingByIdAsync(created.Id);
@@ -111,9 +122,9 @@ public class BookingServiceTests
         var first = await _service.CreateBookingAsync(eventItem.Id);
         await _service.CreateBookingAsync(eventItem.Id);
 
-        _service.MarkAsProcessed(first.Id, BookingStatus.Confirmed);
+        await _service.MarkAsProcessedAsync(first.Id, BookingStatus.Confirmed);
 
-        var pending = _service.GetPendingBookings();
+        var pending = await _service.GetPendingBookingsAsync();
 
         Assert.Single(pending);
         Assert.DoesNotContain(pending, b => b.Id == first.Id);
@@ -152,13 +163,12 @@ public class BookingServiceTests
     {
         var eventItem = await CreateTestEvent(3);
         var booking = await _service.CreateBookingAsync(eventItem.Id);
-        Assert.Equal(2, _eventService.GetEventById(eventItem.Id)!.AvailableSeats);
+        Assert.Equal(2, (await _eventService.GetEventByIdAsync(eventItem.Id))!.AvailableSeats);
 
-        booking.Reject();
-        _eventService.ReleaseSeats(booking.EventId);
+        await _service.MarkAsProcessedAsync(booking.Id, BookingStatus.Rejected);
 
         Assert.Equal(BookingStatus.Rejected, booking.Status);
-        Assert.Equal(3, _eventService.GetEventById(eventItem.Id)!.AvailableSeats);
+        Assert.Equal(3, (await _eventService.GetEventByIdAsync(eventItem.Id))!.AvailableSeats);
     }
 
     [Fact]
@@ -172,15 +182,14 @@ public class BookingServiceTests
             () => _service.CreateBookingAsync(eventItem.Id));
 
         // Отклоняем бронь и возвращаем место в пул
-        booking.Reject();
-        _eventService.ReleaseSeats(booking.EventId);
+        await _service.MarkAsProcessedAsync(booking.Id, BookingStatus.Rejected);
 
         // Теперь место снова можно занять
         var newBooking = await _service.CreateBookingAsync(eventItem.Id);
 
         Assert.Equal(BookingStatus.Pending, newBooking.Status);
         Assert.NotEqual(booking.Id, newBooking.Id);
-        Assert.Equal(0, _eventService.GetEventById(eventItem.Id)!.AvailableSeats);
+        Assert.Equal(0, (await _eventService.GetEventByIdAsync(eventItem.Id))!.AvailableSeats);
     }
 
     [Fact]
@@ -189,7 +198,7 @@ public class BookingServiceTests
         var eventItem = await CreateTestEvent();
         var booking = await _service.CreateBookingAsync(eventItem.Id);
 
-        var result = _service.MarkAsProcessed(booking.Id, BookingStatus.Pending);
+        var result = await _service.MarkAsProcessedAsync(booking.Id, BookingStatus.Pending);
 
         Assert.False(result);
         Assert.Null(booking.ProcessedAt);
@@ -205,7 +214,7 @@ public class BookingServiceTests
         await _service.CreateBookingAsync(eventItem.Id);
         await _service.CreateBookingAsync(eventItem.Id);
 
-        var stored = _eventService.GetEventById(eventItem.Id);
+        var stored = await _eventService.GetEventByIdAsync(eventItem.Id);
         Assert.NotNull(stored);
         Assert.Equal(8, stored.AvailableSeats);
         Assert.Equal(10, stored.TotalSeats);
@@ -218,7 +227,7 @@ public class BookingServiceTests
 
         await _service.CreateBookingAsync(eventItem.Id);
 
-        var stored = _eventService.GetEventById(eventItem.Id);
+        var stored = await _eventService.GetEventByIdAsync(eventItem.Id);
         Assert.NotNull(stored);
         Assert.Equal(4, stored.AvailableSeats);
     }
@@ -238,7 +247,7 @@ public class BookingServiceTests
         Assert.Equal(totalSeats, bookings.Count);
         Assert.Equal(totalSeats, bookings.Select(b => b.Id).Distinct().Count());
         Assert.All(bookings, b => Assert.Equal(BookingStatus.Pending, b.Status));
-        Assert.Equal(0, _eventService.GetEventById(eventItem.Id)!.AvailableSeats);
+        Assert.Equal(0, (await _eventService.GetEventByIdAsync(eventItem.Id))!.AvailableSeats);
     }
 
     [Fact]
@@ -254,7 +263,7 @@ public class BookingServiceTests
         Assert.Equal("No available seats for this event", exception.Message);
         Assert.Equal(BookingStatus.Pending, first.Status);
 
-        var stored = _eventService.GetEventById(eventItem.Id);
+        var stored = await _eventService.GetEventByIdAsync(eventItem.Id);
         Assert.NotNull(stored);
         Assert.Equal(0, stored.AvailableSeats);
     }
@@ -269,7 +278,7 @@ public class BookingServiceTests
             () => _service.CreateBookingAsync(eventItem.Id));
 
         // В хранилище осталась только успешная бронь
-        Assert.Single(_service.GetBookings());
+        Assert.Single((await _service.GetBookingsAsync()));
     }
 
     // ----- Конкурентность -----
@@ -285,9 +294,11 @@ public class BookingServiceTests
         var tasks = Enumerable.Range(0, requests)
             .Select(_ => Task.Run(async () =>
             {
+                using var scope = _database.CreateScope();
+                var service = scope.ServiceProvider.GetRequiredService<IBookingService>();
                 try
                 {
-                    await _service.CreateBookingAsync(eventItem.Id);
+                    await service.CreateBookingAsync(eventItem.Id);
                     return true;
                 }
                 catch (NoAvailableSeatsException)
@@ -301,8 +312,8 @@ public class BookingServiceTests
 
         Assert.Equal(totalSeats, results.Count(success => success));
         Assert.Equal(requests - totalSeats, results.Count(success => !success));
-        Assert.Equal(0, _eventService.GetEventById(eventItem.Id)!.AvailableSeats);
-        Assert.Equal(totalSeats, _service.GetBookings().Count);
+        Assert.Equal(0, (await _eventService.GetEventByIdAsync(eventItem.Id))!.AvailableSeats);
+        Assert.Equal(totalSeats, (await _service.GetBookingsAsync()).Count);
     }
 
     [Fact]
@@ -312,14 +323,19 @@ public class BookingServiceTests
         var eventItem = await CreateTestEvent(totalSeats);
 
         var tasks = Enumerable.Range(0, totalSeats)
-            .Select(_ => Task.Run(() => _service.CreateBookingAsync(eventItem.Id)))
+            .Select(_ => Task.Run(async () =>
+            {
+                using var scope = _database.CreateScope();
+                return await scope.ServiceProvider.GetRequiredService<IBookingService>()
+                    .CreateBookingAsync(eventItem.Id);
+            }))
             .ToArray();
 
         var bookings = await Task.WhenAll(tasks);
 
         Assert.Equal(totalSeats, bookings.Length);
         Assert.Equal(totalSeats, bookings.Select(b => b.Id).Distinct().Count());
-        Assert.Equal(0, _eventService.GetEventById(eventItem.Id)!.AvailableSeats);
+        Assert.Equal(0, (await _eventService.GetEventByIdAsync(eventItem.Id))!.AvailableSeats);
     }
 
     // ----- Неуспешные сценарии -----
@@ -333,19 +349,19 @@ public class BookingServiceTests
             () => _service.CreateBookingAsync(unknownEventId));
 
         Assert.Contains(unknownEventId.ToString(), exception.Message);
-        Assert.Empty(_service.GetBookings());
+        Assert.Empty((await _service.GetBookingsAsync()));
     }
 
     [Fact]
     public async Task CreateBookingAsync_DeletedEvent_ThrowsNotFound()
     {
         var eventItem = await CreateTestEvent();
-        _eventService.DeleteEvent(eventItem.Id);
+        await _eventService.DeleteEventAsync(eventItem.Id);
 
         await Assert.ThrowsAsync<NotFoundException>(
             () => _service.CreateBookingAsync(eventItem.Id));
 
-        Assert.Empty(_service.GetBookings());
+        Assert.Empty((await _service.GetBookingsAsync()));
     }
 
     [Fact]
@@ -360,15 +376,15 @@ public class BookingServiceTests
     }
 
     [Fact]
-    public void GetBookings_EmptyStorage_ReturnsEmptyList()
+    public async Task GetBookings_EmptyStorage_ReturnsEmptyList()
     {
-        Assert.Empty(_service.GetBookings());
+        Assert.Empty((await _service.GetBookingsAsync()));
     }
 
     [Fact]
-    public void MarkAsProcessed_UnknownId_ReturnsFalse()
+    public async Task MarkAsProcessed_UnknownId_ReturnsFalse()
     {
-        var processed = _service.MarkAsProcessed(Guid.NewGuid(), BookingStatus.Confirmed);
+        var processed = await _service.MarkAsProcessedAsync(Guid.NewGuid(), BookingStatus.Confirmed);
 
         Assert.False(processed);
     }

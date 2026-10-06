@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using ProjectWork.DTO;
 using ProjectWork.Services;
@@ -32,14 +32,14 @@ namespace ProjectWork.Controllers
         [HttpGet]
         [ProducesResponseType(typeof(PaginatedResult<Event>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-        public ActionResult<PaginatedResult<Event>> GetEvents(
+        public async Task<ActionResult<PaginatedResult<Event>>> GetEvents(
             [FromQuery] string? title,
             [FromQuery] DateTime? from,
             [FromQuery] DateTime? to,
             [FromQuery][Range(1, int.MaxValue)] int page = 1,
             [FromQuery][Range(1, int.MaxValue)] int pageSize = 10)
         {
-            return Ok(_eventService.GetEvents(title, from, to, page, pageSize));
+            return Ok(await _eventService.GetEventsAsync(title, from, to, page, pageSize));
         }
 
         /// <summary>
@@ -52,9 +52,9 @@ namespace ProjectWork.Controllers
         [HttpGet("{id:guid}")]
         [ProducesResponseType(typeof(Event), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-        public ActionResult<Event> GetEventById(Guid id)
+        public async Task<ActionResult<Event>> GetEventById(Guid id)
         {
-            var eventItem = _eventService.GetEventById(id);
+            var eventItem = await _eventService.GetEventByIdAsync(id);
 
             if (eventItem is null)
                 throw new NotFoundException($"Событие с идентификатором '{id}' не найдено.");
@@ -92,9 +92,9 @@ namespace ProjectWork.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-        public IActionResult UpdateEvent(Guid id, UpdateEvent request)
+        public async Task<IActionResult> UpdateEvent(Guid id, UpdateEvent request)
         {
-            if (!_eventService.UpdateEvent(id, request))
+            if (!await _eventService.UpdateEventAsync(id, request))
                 throw new NotFoundException($"Событие с идентификатором '{id}' не найдено.");
 
             return NoContent();
@@ -110,9 +110,9 @@ namespace ProjectWork.Controllers
         [HttpDelete("{id:guid}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-        public IActionResult DeleteEvent(Guid id)
+        public async Task<IActionResult> DeleteEvent(Guid id)
         {
-            if (!_eventService.DeleteEvent(id))
+            if (!await _eventService.DeleteEventAsync(id))
                 throw new NotFoundException($"Событие с идентификатором '{id}' не найдено.");
 
             return NoContent();

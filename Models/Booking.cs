@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ProjectWork.Models;
 
 /// <summary>
@@ -5,6 +7,19 @@ namespace ProjectWork.Models;
 /// </summary>
 public class Booking
 {
+    private Booking() { }
+
+    [JsonIgnore]
+    public Event Event { get; private set; } = null!;
+
+    public static Booking Create(Guid eventId) => new()
+    {
+        Id = Guid.NewGuid(),
+        EventId = eventId,
+        Status = BookingStatus.Pending,
+        CreatedAt = DateTime.UtcNow
+    };
+
     /// <summary>
     /// Уникальный идентификатор брони
     /// </summary>

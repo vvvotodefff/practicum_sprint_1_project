@@ -1,154 +1,69 @@
+using Microsoft.EntityFrameworkCore;
+using ProjectWork.DataAccess;
 using ProjectWork.Models;
 
 namespace ProjectWork.Services;
 
-/// <summary>
-/// Фоновый сервис: периодически опрашивает хранилище и обрабатывает брони,
-/// ожидающие подтверждения. Брони обрабатываются параллельно
-/// </summary>
-public class BookingProcessingService : BackgroundService
+/// <summary>Каждая фоновая задача получает собственный scope и DbContext.</summary>
+public class BookingProcessingService(
+    IServiceScopeFactory scopeFactory,
+    ILogger<BookingProcessingService> logger) : BackgroundService
 {
-    // Имитация обращения к внешней системе
     private static readonly TimeSpan ProcessingDelay = TimeSpan.FromSeconds(2);
-
-    // Пауза между опросами хранилища
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(1);
 
-    private readonly IBookingService _bookingService;
-    private readonly IEventService _eventService;
-    private readonly ILogger<BookingProcessingService> _logger;
-
-    // Пропускает к записи в хранилище только одну задачу за раз
-    private readonly SemaphoreSlim _processingSemaphore = new(1, 1);
-
-    /// <summary>
-    /// Создаёт фоновый сервис обработки бронирований
-    /// </summary>
-    public BookingProcessingService(IBookingService bookingService,
-        IEventService eventService,
-        ILogger<BookingProcessingService> logger)
-    {
-        _bookingService = bookingService;
-        _eventService = eventService;
-        _logger = logger;
-    }
-
-    /// <summary>
-    /// Цикл обработки: работает, пока приложение не получит сигнал остановки
-    /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Фоновая обработка бронирований запущена");
-
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                var pendingBookings = _bookingService.GetPendingBookings();
-
-                if (pendingBookings.Count > 0)
+                List<Guid> ids;
+                await using (var scope = scopeFactory.CreateAsyncScope())
                 {
-                    // Все брони обрабатываются одновременно
-                    var tasks = pendingBookings.Select(booking => ProcessBookingAsync(booking, stoppingToken));
-                    await Task.WhenAll(tasks);
+                    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    ids = await context.Bookings.AsNoTracking()
+                        .Where(b => b.Status == BookingStatus.Pending)
+                        .Select(b => b.Id).ToListAsync(stoppingToken);
                 }
-
-                await Task.Delay(PollInterval, stoppingToken);
+                // Контекст чтения уже закрыт; между задачами передаются только Id.
+                await Parallel.ForEachAsync(ids,
+                    new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = stoppingToken },
+                    async (id, token) => await ProcessBookingAsync(id, token));
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-                // Штатная остановка приложения — выходим из цикла без ошибки
                 break;
             }
             catch (Exception ex)
             {
-                // Необработанное исключение остановило бы фоновый сервис навсегда,
-                // поэтому логируем и продолжаем работу
-                _logger.LogError(ex, "Ошибка при обработке бронирований");
-                await Task.Delay(PollInterval, CancellationToken.None);
+                logger.LogError(ex, "Ошибка фоновой обработки бронирований");
             }
-        }
 
-        _logger.LogInformation("Фоновая обработка бронирований остановлена");
+            try { await Task.Delay(PollInterval, stoppingToken); }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+        }
     }
 
-    /// <summary>
-    /// Обработать одну бронь: дождаться "внешней системы" и записать результат
-    /// </summary>
-    private async Task ProcessBookingAsync(Booking booking, CancellationToken stoppingToken)
+    private async Task ProcessBookingAsync(Guid id, CancellationToken cancellationToken)
     {
         try
         {
-            // Задержка до захвата семафора: имитации внешнего вызова идут параллельно
-            await Task.Delay(ProcessingDelay, stoppingToken);
-
-            await _processingSemaphore.WaitAsync(stoppingToken);
-            try
-            {
-                var eventItem = _eventService.GetEventById(booking.EventId);
-
-                if (eventItem is null)
-                {
-                    // Событие удалили, пока бронь ждала обработки.
-                    // Возвращать место некуда — самого события больше нет
-                    booking.Reject();
-
-                    _logger.LogWarning("Бронь {BookingId} отклонена: событие {EventId} не найдено",
-                        booking.Id, booking.EventId);
-                    return;
-                }
-
-                booking.Confirm();
-
-                _logger.LogInformation("Бронь {BookingId} переведена в статус {Status}",
-                    booking.Id, booking.Status);
-            }
-            finally
-            {
-                _processingSemaphore.Release();
-            }
+            await Task.Delay(ProcessingDelay, cancellationToken);
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var service = scope.ServiceProvider.GetRequiredService<IBookingService>();
+            if (await service.MarkAsProcessedAsync(id, BookingStatus.Confirmed, cancellationToken))
+                logger.LogInformation("Бронь {BookingId} подтверждена", id);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // Приложение останавливается: бронь остаётся Pending
-            // и будет обработана при следующем запуске
+            // Незавершённая бронь остаётся Pending и будет обработана после запуска.
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Не удалось обработать бронь {BookingId}, бронь отклонена", booking.Id);
-
-            await RejectAndReleaseSeatAsync(booking);
-        }
-    }
-
-    /// <summary>
-    /// Освобождает семафор при остановке приложения
-    /// </summary>
-    public override void Dispose()
-    {
-        _processingSemaphore.Dispose();
-        base.Dispose();
-    }
-
-    /// <summary>
-    /// Компенсация после сбоя: отклонить бронь и вернуть место в пул
-    /// </summary>
-    private async Task RejectAndReleaseSeatAsync(Booking booking)
-    {
-        // Токен не передаём: компенсацию нужно выполнить даже при остановке приложения
-        await _processingSemaphore.WaitAsync(CancellationToken.None);
-        try
-        {
-            booking.Reject();
-            _eventService.ReleaseSeats(booking.EventId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Не удалось откатить бронь {BookingId}", booking.Id);
-        }
-        finally
-        {
-            _processingSemaphore.Release();
+            // При ошибке БД оставляем Pending для повторной попытки; повреждённый
+            // контекст закрывается вместе со scope и не используется повторно.
+            logger.LogError(ex, "Не удалось обработать бронь {BookingId}; обработка будет повторена", id);
         }
     }
 }
