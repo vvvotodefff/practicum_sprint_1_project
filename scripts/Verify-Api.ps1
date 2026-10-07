@@ -55,7 +55,7 @@ function Stop-Api {
 }
 
 function New-TestEvent([int]$seats) {
-    $title = "Sprint5-check-$([guid]::NewGuid())"
+    $title = "EventApi-check-$([guid]::NewGuid())"
     $request = @{
         title = $title; description = 'HTTP verification'
         startAt = '2026-11-01T12:00:00Z'; endAt = '2026-11-01T13:00:00Z'; totalSeats = $seats
@@ -72,7 +72,17 @@ try {
     $portCheck = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $Port)
     try { $portCheck.Start() } finally { $portCheck.Stop() }
     $swagger = Start-Api
-    Assert-Check ($null -ne $swagger.paths.'/events' -and $null -ne $swagger.paths.'/events/{id}/book') 'Swagger routes missing'
+    $expectedOperations = @{
+        '/events' = @('get', 'post')
+        '/events/{id}' = @('get', 'put', 'delete')
+        '/events/{id}/book' = @('post')
+        '/bookings/{id}' = @('get')
+    }
+    foreach ($path in $expectedOperations.Keys) {
+        foreach ($method in $expectedOperations[$path]) {
+            Assert-Check ($null -ne $swagger.paths.$path.$method) "Swagger operation missing: $method $path"
+        }
+    }
     Assert-Check ((Request GET '/swagger/index.html').Code -eq 200) 'Swagger UI unavailable'
     $invalid = Request POST '/events' @{
         title = 'Invalid'; startAt = '2026-11-01T13:00:00Z'
