@@ -1,5 +1,4 @@
-using Microsoft.EntityFrameworkCore;
-using ProjectWork.DataAccess;
+using ProjectWork.DataAccess.Repositories;
 using ProjectWork.Models;
 
 namespace ProjectWork.Services;
@@ -21,10 +20,8 @@ public class BookingProcessingService(
                 List<Guid> ids;
                 await using (var scope = scopeFactory.CreateAsyncScope())
                 {
-                    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    ids = await context.Bookings.AsNoTracking()
-                        .Where(b => b.Status == BookingStatus.Pending)
-                        .Select(b => b.Id).ToListAsync(stoppingToken);
+                    var repository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+                    ids = await repository.GetIdsByStatusAsync(BookingStatus.Pending, stoppingToken);
                 }
                 // Контекст чтения уже закрыт; между задачами передаются только Id.
                 await Parallel.ForEachAsync(ids,

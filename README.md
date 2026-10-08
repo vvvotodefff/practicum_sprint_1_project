@@ -1,13 +1,15 @@
 # Сервис управления мероприятиями
 
-Учебный ASP.NET Core Web API, проектная работа пятого спринта.
+Учебный ASP.NET Core Web API, проектная работа шестого спринта.
 События и бронирования хранятся в PostgreSQL через Entity Framework Core.
-Сервисы работают напрямую с `AppDbContext`; после перезапуска API данные сохраняются.
+Сервисы работают через репозитории, а схема БД управляется миграциями EF Core.
+После перезапуска API данные сохраняются.
 
 ## Требования и запуск
 
 - .NET SDK 10.
-- Docker Desktop с Linux-контейнерами или PostgreSQL 16.
+- Docker Desktop с Linux-контейнерами для PostgreSQL и интеграционных тестов.
+  Сам API также можно подключить к отдельно установленной PostgreSQL 16.
 - PowerShell 7 для необязательного сценария проверки `scripts/Verify-Api.ps1`.
 
 Из корня репозитория:
@@ -24,7 +26,7 @@ Swagger UI: [http://localhost:5259/swagger](http://localhost:5259/swagger).
 Для HTTPS используйте профиль `https`: адрес `https://localhost:7167`.
 При необходимости доверьте локальный сертификат командой `dotnet dev-certs https --trust`.
 
-## PostgreSQL и создание таблиц
+## PostgreSQL и миграции
 
 Используется compose-файл из задания: образ `postgres:16-alpine`,
 контейнер `eventapi-postgres`, база `eventapi`.
@@ -49,13 +51,44 @@ $env:ConnectionStrings__DefaultConnection = "Host=localhost;Port=5433;Database=e
 dotnet run --project ProjectWork.csproj --launch-profile http
 ```
 
-При запуске API создаёт scope и вызывает `EnsureCreatedAsync()`.
-На пустой БД автоматически создаются таблицы `events` и `bookings`, ключи,
-индексы и ограничения. Повторный запуск сохраняет существующие данные.
+При запуске API создаёт scope и вызывает `Database.MigrateAsync()`.
+Начальная миграция `20261006154025_InitialCreate` уже включена в репозиторий:
+на пустой БД она создаёт `events`, `bookings`, ключи, индексы и ограничения.
+Применённые миграции записываются в `__EFMigrationsHistory`.
+Повторный запуск применяет только новые миграции, существующие данные сохраняются.
+Сервер PostgreSQL должен быть доступен до запуска API; ручной SQL для создания схемы не нужен.
 
-`EnsureCreated` не обновляет уже существующую схему и не используется вместе с миграциями.
-При изменении модели потребуется отдельно решить вопрос обновления схемы;
-миграции относятся к следующему спринту. База должна быть доступна до запуска API.
+Для CLI-команд нужен `dotnet-ef` той же версии, что пакеты EF Core проекта:
+
+```bash
+dotnet tool install --global dotnet-ef --version 10.0.12
+```
+
+Если инструмент уже установлен, вместо `install` выполните
+`dotnet tool update --global dotnet-ef --version 10.0.12`.
+
+Из корня репозитория:
+
+```bash
+# Посмотреть миграции и применить их без запуска API
+dotnet ef migrations list --project ProjectWork.csproj --startup-project ProjectWork.csproj
+dotnet ef database update --project ProjectWork.csproj --startup-project ProjectWork.csproj
+
+# Проверить, не разошлись ли модель и снимок миграции
+dotnet ef migrations has-pending-model-changes --project ProjectWork.csproj --startup-project ProjectWork.csproj
+
+# Только после изменения модели: создать НОВУЮ миграцию с осмысленным именем
+dotnet ef migrations add DescribeModelChange --project ProjectWork.csproj --startup-project ProjectWork.csproj --output-dir DataAccess/Migrations
+```
+
+Последняя команда — пример для дальнейшей разработки, для обычного запуска она не нужна.
+Не создавайте `InitialCreate` повторно. Миграции, их Designer-файлы и
+`AppDbContextModelSnapshot` хранятся в Git вместе с кодом.
+
+`EnsureCreated` больше не используется и не должен смешиваться с миграциями.
+Если у вас осталась старая БД, созданная через `EnsureCreated`, перед переходом
+сохраните нужные данные и укажите новую пустую учебную БД в строке подключения.
+Старая схема без истории миграций автоматически не преобразуется.
 
 Проверка и остановка контейнера:
 
@@ -108,7 +141,7 @@ docker compose stop postgres
    ```json
    {
      "title": "Встреча команды",
-     "description": "Обсуждение пятого спринта",
+     "description": "Обсуждение шестого спринта",
      "startAt": "2026-11-01T12:00:00Z",
      "endAt": "2026-11-01T13:00:00Z",
      "totalSeats": 3
@@ -140,8 +173,15 @@ docker compose stop postgres
 
 ## Работа с данными и конкурентностью
 
-`AppDbContext`, `EventService` и `BookingService` зарегистрированы как Scoped.
-Для чтения применяется `AsNoTracking`; изменения сохраняются через `SaveChangesAsync`.
+Контроллеры обращаются к сервисам, сервисы — к `IEventRepository` и
+`IBookingRepository`, репозитории — к `AppDbContext`.
+Сервисы не выполняют запросы EF Core и не содержат in-memory хранилищ.
+Репозитории отвечают за доступ к данным, правила бронирования остаются в сервисах и моделях.
+
+`AppDbContext`, оба репозитория, `EventService` и `BookingService`
+зарегистрированы как Scoped и разделяют один контекст внутри запроса.
+Для обычного чтения применяется `AsNoTracking`; методы `GetByIdForUpdateAsync`
+возвращают отслеживаемые сущности. Изменения сохраняются через `SaveChangesAsync`.
 Fluent API конфигурации автоматически подключаются из сборки.
 Идентификаторы создаются в коде (`ValueGeneratedNever`), статус брони хранится строкой.
 Связь: одно событие — много броней. Удаление события каскадно удаляет его брони.
@@ -164,19 +204,41 @@ Fluent API конфигурации автоматически подключа�
 
 ## Тесты
 
+Для полного прогона запустите Docker. Базу из `docker-compose.yml` для самих
+тестов поднимать необязательно: Testcontainers создаёт отдельный контейнер.
+При первом запуске нужен доступ к реестру образов Docker и NuGet для восстановления пакетов.
+
 ```bash
 dotnet test
 ```
 
-Тестам не нужен PostgreSQL: `TestDatabase` настраивает DI с
-`Microsoft.EntityFrameworkCore.InMemory`.
-Каждый экземпляр тестового класса получает уникальное имя БД, заданное
-до регистрации контекста. Scope внутри теста используют одну БД,
-каждый конкурентный запрос — свой контекст.
+В решении два тестовых проекта:
 
-Проверяются CRUD, фильтры, пагинация, валидация, ограничения мест,
-бронирование, повторная обработка, чтение из нового scope, каскадное удаление
-и фоновая обработка. InMemory не заменяет проверку SQL и ограничений PostgreSQL.
+- `ProjectWork.Tests` — 74 юнит-теста с EF Core InMemory, Docker не нужен.
+  Проверяются доменные правила, сервисы, конкурентность и фоновая обработка.
+  `TestDatabase` создаёт уникальную БД на экземпляр тестового класса;
+  каждый конкурентный запрос использует собственный scope и контекст.
+- `ProjectWork.IntegrationTests` — 81 интеграционный тест с настоящей PostgreSQL 16
+  через Testcontainers. Проверяются все методы обоих репозиториев, фильтры,
+  пагинация, обновление, удаление, транзакции, миграции и ограничения БД.
+
+```bash
+# Только юнит-тесты, без Docker
+dotnet test ProjectWork.Tests/ProjectWork.Tests.csproj
+
+# Только интеграционные тесты, Docker обязателен
+dotnet test ProjectWork.IntegrationTests/ProjectWork.IntegrationTests.csproj
+
+# Выбор интеграционных тестов по категории
+dotnet test --filter "Category=Integration"
+```
+
+Фикстура `IAsyncLifetime` поднимает один PostgreSQL-контейнер на всю коллекцию.
+Перед каждым тестом временная БД пересоздаётся через `EnsureDeletedAsync()` и
+`MigrateAsync()`; тесты коллекции не выполняются параллельно. Рабочая БД из
+`appsettings.json` не затрагивается. После прогона контейнер удаляется.
+Подробности: [интеграционные тесты](ProjectWork.IntegrationTests/README.md).
+Результаты итогового прогона: [чек-лист шестого спринта](docs/sprint-6-checklist.md).
 
 После сборки можно выполнить автоматическую HTTP-проверку реального PostgreSQL:
 
@@ -184,8 +246,11 @@ dotnet test
 pwsh -File scripts/Verify-Api.ps1
 ```
 
+Для этого сценария уже нужны запущенная PostgreSQL из compose и собранный API.
 Сценарий запускает отдельный экземпляр API на `127.0.0.1:5260`,
-проверяет Swagger JSON, CRUD, валидацию, конкурентность и перезапуск.
+проверяет все семь операций в Swagger JSON, доступность Swagger UI, CRUD,
+валидацию, конкурентность и перезапуск. HTTP-проверка не заменяет ручной сценарий
+с кнопками Swagger, описанный выше.
 Он использует настроенную базу, создаёт тестовые события с уникальными Id
 и удаляет только свои события вместе с бронями в конце проверки.
 
@@ -195,13 +260,17 @@ pwsh -File scripts/Verify-Api.ps1
 Controllers/                HTTP-эндпоинты
 DTO/                        Контракты запросов и ответов
 Models/                     Event, Booking и доменные правила
-DataAccess/                 AppDbContext и общий семафор записи
+DataAccess/                 AppDbContext
 DataAccess/Configurations/  Маппинг таблиц и связей через Fluent API
-Services/                   Асинхронные сервисы и фоновая обработка
+DataAccess/Repositories/    Интерфейсы и реализации репозиториев
+DataAccess/Migrations/      InitialCreate и снимок модели EF Core
+Services/                   Бизнес-логика, общий семафор записи и фоновая обработка
 Exceptions/                 Доменные исключения
 Middleware/                 Преобразование исключений в Problem Details
 ProjectWork.Tests/          xUnit и EF Core InMemory
+ProjectWork.IntegrationTests/ xUnit и PostgreSQL через Testcontainers
 scripts/                    Проверка API с настоящей PostgreSQL
+docs/                       Результаты проверки по чек-листу спринта
 docker-compose.yml          Локальная PostgreSQL
-Program.cs                  DI, EnsureCreated и HTTP pipeline
+Program.cs                  DI, MigrateAsync и HTTP pipeline
 ```
