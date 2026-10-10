@@ -24,8 +24,12 @@ function Request([string]$method, [string]$path, $body = $null) {
         $parameters.Body = $body | ConvertTo-Json -Depth 5 -Compress
     }
     $response = Invoke-WebRequest @parameters
-    $json = if ($response.Content) {
-        try { $response.Content | ConvertFrom-Json } catch { $null }
+    # application/problem+json может возвращаться PowerShell как byte[], а не строка.
+    $content = if ($response.Content -is [byte[]]) {
+        [System.Text.Encoding]::UTF8.GetString($response.Content)
+    } else { [string]$response.Content }
+    $json = if ($content) {
+        try { $content | ConvertFrom-Json } catch { $null }
     } else { $null }
     return [pscustomobject]@{ Code = [int]$response.StatusCode; Json = $json; Response = $response }
 }
@@ -93,11 +97,18 @@ try {
     }
     Assert-Check ($invalid.Code -eq 400) 'Invalid dates must return 400'
     Assert-Check ($invalid.Json.status -eq 400) 'Domain validation must return Problem Details with status 400'
+    Assert-Check ($invalid.Response.Headers['Content-Type'] -match 'application/problem\+json') 'Domain error must use application/problem+json'
     $missingDates = Request POST '/events' @{ title = 'Missing dates'; totalSeats = 1 }
     Assert-Check ($missingDates.Code -eq 400) 'Missing dates must return 400'
     Assert-Check ((Request POST '/events' @{ title = 'Missing fields' }).Code -eq 400) 'Missing fields must return 400'
     $missing = [guid]::NewGuid()
     Assert-Check ((Request GET "/events/$missing").Code -eq 404) 'Missing event must return 404'
+    Assert-Check ((Request GET "/bookings/$missing").Code -eq 404) 'Missing booking must return 404'
+    Assert-Check ((Request POST "/events/$missing/book").Code -eq 404) 'Booking a missing event must return 404'
+    foreach ($query in @('page=0', 'pageSize=0')) {
+        $invalidPage = Request GET "/events?$query"
+        Assert-Check ($invalidPage.Code -eq 400 -and $null -ne $invalidPage.Json.errors) 'Automatic query validation must return 400 with errors'
+    }
 
     $event = New-TestEvent 5
     $client = [System.Net.Http.HttpClient]::new()
@@ -119,7 +130,10 @@ try {
                     Assert-Check ($null -eq $bookingDto.PSObject.Properties['event']) 'Booking response leaks navigation properties'
                     Assert-Check ($response.Headers.Location.ToString() -match "/bookings/$($bookingDto.id)") 'Invalid booking Location'
                 }
-                elseif ([int]$response.StatusCode -eq 409) { $conflicts++ }
+                elseif ([int]$response.StatusCode -eq 409) {
+                    Assert-Check ($response.Content.Headers.ContentType.MediaType -eq 'application/problem+json') 'Booking conflict must use application/problem+json'
+                    $conflicts++
+                }
                 else { throw "Booking failed: $($response.StatusCode) $body" }
             } finally { $response.Dispose() }
         }

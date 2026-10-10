@@ -1,6 +1,8 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -171,7 +173,9 @@ public sealed class ApiResponseTests : IDisposable
     [InlineData("validation", StatusCodes.Status400BadRequest)]
     [InlineData("missing", StatusCodes.Status404NotFound)]
     [InlineData("seats", StatusCodes.Status409Conflict)]
-    public async Task Middleware_MapsDomainExceptionToProblemDetails(string error, int status)
+    [InlineData("annotations", StatusCodes.Status400BadRequest)]
+    [InlineData("argument", StatusCodes.Status400BadRequest)]
+    public async Task Middleware_MapsKnownExceptionToProblemDetails(string error, int status)
     {
         // Arrange
         Exception exception = error switch
@@ -179,6 +183,8 @@ public sealed class ApiResponseTests : IDisposable
             "validation" => new DomainValidationException("Некорректные даты"),
             "missing" => new NotFoundException("Нет события"),
             "seats" => new NoAvailableSeatsException("Нет мест"),
+            "annotations" => new ValidationException("Не заполнено обязательное поле"),
+            "argument" => new ArgumentException("Некорректный запрос"),
             _ => throw new ArgumentOutOfRangeException(nameof(error))
         };
         var middleware = new ExceptionHandlingMiddleware(_ => Task.FromException(exception),
@@ -192,9 +198,74 @@ public sealed class ApiResponseTests : IDisposable
 
         // Assert
         Assert.Equal(status, context.Response.StatusCode);
+        Assert.StartsWith("application/problem+json", context.Response.ContentType);
         body.Position = 0;
         using var json = await JsonDocument.ParseAsync(body);
         Assert.Equal(status, json.RootElement.GetProperty("status").GetInt32());
         Assert.Equal(exception.Message, json.RootElement.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Middleware_UnexpectedExceptionReturns500WithoutInternalDetails()
+    {
+        var exception = new InvalidOperationException("Database failure: password=do-not-expose");
+        var middleware = new ExceptionHandlingMiddleware(_ => Task.FromException(exception),
+            NullLogger<ExceptionHandlingMiddleware>.Instance);
+        using var body = new MemoryStream();
+        var context = new DefaultHttpContext { RequestServices = _scope.ServiceProvider };
+        context.Response.Body = body;
+
+        await middleware.InvokeAsync(context);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, context.Response.StatusCode);
+        Assert.StartsWith("application/problem+json", context.Response.ContentType);
+        body.Position = 0;
+        using var json = await JsonDocument.ParseAsync(body);
+        Assert.Equal(500, json.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal("Произошла непредвиденная ошибка. Попробуйте позже.",
+            json.RootElement.GetProperty("detail").GetString());
+        Assert.DoesNotContain(exception.Message, json.RootElement.GetRawText());
+    }
+
+    [Fact]
+    public async Task Middleware_ClientCancellationIsNotConvertedTo500()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var exception = new OperationCanceledException(cancellation.Token);
+        var middleware = new ExceptionHandlingMiddleware(_ => Task.FromException(exception),
+            NullLogger<ExceptionHandlingMiddleware>.Instance);
+        using var body = new MemoryStream();
+        var context = new DefaultHttpContext { RequestAborted = cancellation.Token };
+        context.Response.Body = body;
+
+        var actual = await Assert.ThrowsAsync<OperationCanceledException>(() => middleware.InvokeAsync(context));
+
+        Assert.Same(exception, actual);
+        Assert.Equal(0, body.Length);
+        Assert.Null(context.Response.ContentType);
+    }
+
+    [Fact]
+    public async Task Middleware_DoesNotOverwriteResponseThatHasAlreadyStarted()
+    {
+        var exception = new InvalidOperationException("Failure after sending headers");
+        var middleware = new ExceptionHandlingMiddleware(_ => Task.FromException(exception),
+            NullLogger<ExceptionHandlingMiddleware>.Instance);
+        using var body = new MemoryStream();
+        var context = new DefaultHttpContext();
+        context.Features.Set<IHttpResponseFeature>(new StartedResponseFeature());
+        context.Response.Body = body;
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => middleware.InvokeAsync(context));
+
+        Assert.Same(exception, actual);
+        Assert.Equal(0, body.Length);
+        Assert.Null(context.Response.ContentType);
+    }
+
+    private sealed class StartedResponseFeature : HttpResponseFeature
+    {
+        public override bool HasStarted => true;
     }
 }

@@ -1,34 +1,17 @@
-using System.Text.Json.Serialization;
-using Microsoft.EntityFrameworkCore;
-using ProjectWork.Application.Services;
+using ProjectWork;
+using ProjectWork.Application;
 using ProjectWork.Infrastructure;
-using ProjectWork.Infrastructure.Persistence;
 using ProjectWork.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers().AddJsonOptions(options =>
-    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-builder.Services.AddProblemDetails();
-builder.Services.AddSwaggerGen(options =>
-{
-    var xmlFilename = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
-    var applicationXmlFilename = $"{typeof(IEventService).Assembly.GetName().Name}.xml";
-    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, applicationXmlFilename));
-});
+builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
-builder.Services.AddScoped<IEventService, EventService>();
-builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddPresentationServices();
 
 var app = builder.Build();
 
-// Миграции создают базу и последовательно обновляют её схему при запуске.
-await using (var scope = app.Services.CreateAsyncScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await context.Database.MigrateAsync();
-}
+await app.Services.MigrateDatabaseAsync();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseStatusCodePages();

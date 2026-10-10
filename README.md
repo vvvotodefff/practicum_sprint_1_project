@@ -2,7 +2,8 @@
 
 Учебный ASP.NET Core Web API. В седьмом спринте выполняется разделение на слои;
 на текущем этапе завершены перенос предметной области в Domain (этап 3),
-прикладной логики в Application (этап 4) и инфраструктуры в Infrastructure (этап 5).
+прикладной логики в Application (этап 4), инфраструктуры в Infrastructure (этап 5)
+и настройка Presentation (этап 6).
 События и бронирования хранятся в PostgreSQL через Entity Framework Core.
 Сервисы работают через репозитории, а схема БД управляется миграциями EF Core.
 После перезапуска API данные сохраняются.
@@ -16,7 +17,9 @@ JSON-сериализации или DataAnnotations. Правила созда�
 
 `ProjectWork.Application` содержит сервисы, их интерфейсы, интерфейсы репозиториев,
 DTO, `PaginatedResult<T>` и общий семафор записи `EventWriteLock`.
-Библиотека зависит только от Domain, без ссылок на Infrastructure, EF Core и ASP.NET Core.
+Из проектов библиотека зависит только от Domain, без ссылок на Infrastructure,
+EF Core и ASP.NET Core. Для `AddApplicationServices()` подключён только пакет
+`Microsoft.Extensions.DependencyInjection.Abstractions`.
 XML-комментарии DTO подключены к Swagger из сборки Application.
 
 `ProjectWork.Infrastructure` содержит `AppDbContext`, Fluent API-конфигурации,
@@ -30,8 +33,19 @@ XML-комментарии DTO подключены к Swagger из сборки
 Строка подключения остаётся в конфигурации веб-проекта, её отсутствие проверяется
 при регистрации. HTTP-контракты и правила бронирования не изменены.
 
-Следующие этапы — завершить настройку Presentation и уточнить ссылки тестовых
-проектов на слои. Пока тестовые проекты сохраняют ссылку на веб-проект.
+Веб-проект `ProjectWork` выполняет роль Presentation: контроллеры принимают HTTP-запросы,
+вызывают интерфейсы Application и возвращают DTO с нужными HTTP-статусами.
+Правила дат, мест и статусов бронирований остаются в Application и Domain.
+`ExceptionHandlingMiddleware` преобразует исключения в Problem Details.
+
+`Program.cs` — точка сборки приложения: вызывает `AddApplicationServices()`,
+`AddInfrastructureServices(configuration)` и `AddPresentationServices()`,
+инициализирует базу через `MigrateDatabaseAsync()` и настраивает HTTP-конвейер.
+Регистрация контроллеров, JSON и Swagger находится в `DependencyInjection.cs`
+веб-проекта. В `Program.cs` нет прямой работы с EF Core или `AppDbContext`.
+
+Следующий этап — уточнить ссылки тестовых проектов на слои. Пока тестовые проекты
+сохраняют ссылку на веб-проект; их `ProjectReference` будут обновлены на этапе 7.
 
 ## Требования и запуск
 
@@ -79,7 +93,9 @@ $env:ConnectionStrings__DefaultConnection = "Host=localhost;Port=5433;Database=e
 dotnet run --project ProjectWork.csproj --launch-profile http
 ```
 
-При запуске API создаёт scope и вызывает `Database.MigrateAsync()`.
+При запуске API вызывает `app.Services.MigrateDatabaseAsync()`. Этот метод из
+Infrastructure создаёт scope и вызывает `Database.MigrateAsync()` до запуска
+HTTP-конвейера и фонового сервиса.
 Начальная миграция `20261006154025_InitialCreate` уже включена в репозиторий:
 на пустой БД она создаёт `events`, `bookings`, ключи, индексы и ограничения.
 Применённые миграции записываются в `__EFMigrationsHistory`.
@@ -206,6 +222,11 @@ docker compose stop postgres
 `500` — непредвиденная ошибка. Автоматическая валидация DTO дополнительно
 возвращает `errors` в Validation Problem Details.
 
+Middleware явно задаёт `Content-Type: application/problem+json; charset=utf-8`.
+Для ожидаемых ошибок сохраняется понятное описание; при `500` клиент получает
+нейтральное сообщение, подробности исключения остаются в журнале сервера.
+Отмена запроса клиентом не преобразуется в `500`, уже отправленный ответ не перезаписывается.
+
 ## Работа с данными и конкурентностью
 
 Контроллеры обращаются к сервисам, сервисы — к `IEventRepository` и
@@ -249,11 +270,13 @@ dotnet test
 
 В решении два тестовых проекта:
 
-- `ProjectWork.Tests` — 114 юнит-тестов, Docker не нужен.
+- `ProjectWork.Tests` — 121 юнит-тест, Docker не нужен.
   Проверяются доменные правила Create/Update, UTC, сервисы, конкурентность,
   фоновая обработка, DTO-контракты ответов и HTTP-маппинг доменных исключений.
   Дополнительно проверяются регистрация Infrastructure, Scoped lifetime, фоновый
   сервис, настройки PostgreSQL и обнаружение миграций без соединения с БД.
+  Также проверяются регистрация Application, формат ошибок, безопасный ответ `500`,
+  отмена запроса и запрет перезаписи уже начатого ответа.
   Для тестов доступа к данным используется EF Core InMemory.
   `TestDatabase` создаёт уникальную БД на экземпляр тестового класса;
   каждый конкурентный запрос использует собственный scope и контекст.
@@ -303,17 +326,20 @@ ProjectWork.Application/Abstractions/Repositories/ Интерфейсы репо
 ProjectWork.Application/Services/ Сервисы, их интерфейсы и общий семафор записи
 ProjectWork.Application/DTO/ Контракты запросов и ответов
 ProjectWork.Application/Common/ PaginatedResult<T>
+ProjectWork.Application/DependencyInjection.cs Регистрация прикладных сервисов
 ProjectWork.Infrastructure/Persistence/ AppDbContext
 ProjectWork.Infrastructure/Persistence/Configurations/ Маппинг через Fluent API
 ProjectWork.Infrastructure/Persistence/Migrations/ InitialCreate и снимок модели
 ProjectWork.Infrastructure/Repositories/ EF Core-реализации репозиториев
 ProjectWork.Infrastructure/BackgroundServices/ Фоновая обработка бронирований
 ProjectWork.Infrastructure/DependencyInjection.cs Регистрация инфраструктуры
+ProjectWork.Infrastructure/DatabaseInitialization.cs Применение миграций в отдельном scope
 Middleware/                 Преобразование исключений в Problem Details
 ProjectWork.Tests/          xUnit и EF Core InMemory
 ProjectWork.IntegrationTests/ xUnit и PostgreSQL через Testcontainers
 scripts/                    Проверка API с настоящей PostgreSQL
 docs/                       Результаты проверки по чек-листу спринта
 docker-compose.yml          Локальная PostgreSQL
-Program.cs                  DI, MigrateAsync и HTTP pipeline
+DependencyInjection.cs      Настройки контроллеров, JSON, Problem Details и Swagger
+Program.cs                  Composition root и HTTP pipeline
 ```

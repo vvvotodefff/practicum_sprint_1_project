@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using ProjectWork.Application;
 using ProjectWork.Application.Abstractions.Repositories;
 using ProjectWork.Infrastructure.Persistence;
 using ProjectWork.Infrastructure.Repositories;
-using ProjectWork.Application.Services;
 
 namespace ProjectWork.Tests;
 
@@ -19,8 +19,7 @@ internal sealed class TestDatabase : IDisposable
         services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(databaseName));
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IBookingRepository, BookingRepository>();
-        services.AddScoped<IEventService, EventService>();
-        services.AddScoped<IBookingService, BookingService>();
+        services.AddApplicationServices();
         Provider = services.BuildServiceProvider(new ServiceProviderOptions
         {
             ValidateScopes = true, ValidateOnBuild = true

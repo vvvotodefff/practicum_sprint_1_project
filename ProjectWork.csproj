@@ -17,7 +17,7 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.2" />
   </ItemGroup>
 
-  <!-- Исключаем лишнее из решения-->
+  <!-- Исключаем исходники и ресурсы вложенных проектов из веб-проекта. -->
   <ItemGroup>
     <Compile Remove="ProjectWork.Tests\**" />
     <Content Remove="ProjectWork.Tests\**" />
@@ -46,10 +46,6 @@
   <ItemGroup>
     <ProjectReference Include="ProjectWork.Application\ProjectWork.Application.csproj" />
     <ProjectReference Include="ProjectWork.Infrastructure\ProjectWork.Infrastructure.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="DTO\" />
-    <Folder Include="Models\" />
   </ItemGroup>
 
 </Project>
