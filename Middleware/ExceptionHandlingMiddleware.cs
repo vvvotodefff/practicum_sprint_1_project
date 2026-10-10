@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
-using ProjectWork.Exceptions;
+using ProjectWork.Domain.Exceptions;
 
 namespace ProjectWork.Middleware
 {
@@ -33,6 +33,7 @@ namespace ProjectWork.Middleware
             {
                 NotFoundException => (StatusCodes.Status404NotFound, "Ресурс не найден"),
                 NoAvailableSeatsException => (StatusCodes.Status409Conflict, "Нет свободных мест"),
+                DomainValidationException => (StatusCodes.Status400BadRequest, "Ошибка валидации"),
                 ValidationException => (StatusCodes.Status400BadRequest, "Ошибка валидации"),
                 ArgumentException => (StatusCodes.Status400BadRequest, "Некорректный запрос"),
                 _ => (StatusCodes.Status500InternalServerError, "Внутренняя ошибка сервера")

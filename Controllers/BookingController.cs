@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using ProjectWork.Exceptions;
-using ProjectWork.Models;
+using ProjectWork.Domain.Exceptions;
+using ProjectWork.DTO;
 using ProjectWork.Services;
 
 namespace ProjectWork.Controllers
@@ -30,14 +30,15 @@ namespace ProjectWork.Controllers
         /// <response code="404">Событие с указанным ID не найдено</response>
         /// <response code="409">На событии не осталось свободных мест</response>
         [HttpPost("events/{id:guid}/book")]
-        [ProducesResponseType(typeof(Booking), StatusCodes.Status202Accepted)]
+        [ProducesResponseType(typeof(BookingInfo), StatusCodes.Status202Accepted)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-        public async Task<ActionResult<Booking>> BookEvent(Guid id)
+        public async Task<ActionResult<BookingInfo>> BookEvent(Guid id)
         {
             var booking = await _bookingService.CreateBookingAsync(id);
 
-            return AcceptedAtAction(nameof(GetBookingById), new { id = booking.Id }, booking);
+            return AcceptedAtAction(nameof(GetBookingById), new { id = booking.Id },
+                BookingInfo.FromBooking(booking));
         }
 
         /// <summary>
@@ -48,16 +49,16 @@ namespace ProjectWork.Controllers
         /// <response code="200">Успешно возвращает бронь с указанным ID</response>
         /// <response code="404">Бронь с указанным ID не найдена</response>
         [HttpGet("bookings/{id:guid}")]
-        [ProducesResponseType(typeof(Booking), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(BookingInfo), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<Booking>> GetBookingById(Guid id)
+        public async Task<ActionResult<BookingInfo>> GetBookingById(Guid id)
         {
             var booking = await _bookingService.GetBookingByIdAsync(id);
 
             if (booking is null)
                 throw new NotFoundException($"Бронь с идентификатором '{id}' не найдена.");
 
-            return Ok(booking);
+            return Ok(BookingInfo.FromBooking(booking));
         }
     }
 }

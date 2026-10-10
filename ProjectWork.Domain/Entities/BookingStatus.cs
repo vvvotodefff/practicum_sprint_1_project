@@ -1,4 +1,4 @@
-namespace ProjectWork.Models;
+namespace ProjectWork.Domain.Entities;
 
 /// <summary>
 /// Статус бронирования

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectWork.Domain.Entities;
 using ProjectWork.Models;
 
 namespace ProjectWork.DataAccess.Repositories;

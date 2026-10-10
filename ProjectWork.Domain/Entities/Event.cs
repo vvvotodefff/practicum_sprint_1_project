@@ -1,18 +1,15 @@
-using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
+using ProjectWork.Domain.Exceptions;
 
-namespace ProjectWork.Models;
+namespace ProjectWork.Domain.Entities;
 
-public class Event : IValidatableObject
+public class Event
 {
     private Event() { }
 
-    [JsonIgnore]
     public ICollection<Booking> Bookings { get; private set; } = new List<Booking>();
 
     public Guid Id { get; set; }
 
-    [Required(ErrorMessage = "Название обязательно для заполнения")]
     public string Title { get; set; } = null!;
 
     public string? Description { get; set; }
@@ -29,7 +26,7 @@ public class Event : IValidatableObject
 
     /// <summary>
     /// Создать событие: проверяет данные, присваивает идентификатор
-    /// и делает все места свободными. Бросает <see cref="ValidationException"/>,
+    /// и делает все места свободными. Бросает <see cref="DomainValidationException"/>,
     /// если данные некорректны
     /// </summary>
     public static Event Create(string title, string? description,
@@ -40,7 +37,7 @@ public class Event : IValidatableObject
         var errors = GetErrors(title, description, startAt, endAt, totalSeats).ToList();
 
         if (errors.Count > 0)
-            throw new ValidationException(string.Join(" ", errors.Select(e => e.Message)));
+            throw new DomainValidationException(string.Join(" ", errors.Select(e => e.Message)));
 
         return new Event
         {
@@ -56,7 +53,7 @@ public class Event : IValidatableObject
 
     /// <summary>
     /// Обновить данные события. Количество свободных мест пересчитывается так,
-    /// чтобы уже занятые места сохранились. Бросает <see cref="ValidationException"/>,
+    /// чтобы уже занятые места сохранились. Бросает <see cref="DomainValidationException"/>,
     /// если данные некорректны или новых мест меньше, чем уже занято
     /// </summary>
     public void Update(string title, string? description,
@@ -67,12 +64,12 @@ public class Event : IValidatableObject
         var errors = GetErrors(title, description, startAt, endAt, totalSeats).ToList();
 
         if (errors.Count > 0)
-            throw new ValidationException(string.Join(" ", errors.Select(e => e.Message)));
+            throw new DomainValidationException(string.Join(" ", errors.Select(e => e.Message)));
 
         var occupiedSeats = TotalSeats - AvailableSeats;
 
         if (totalSeats < occupiedSeats)
-            throw new ValidationException(
+            throw new DomainValidationException(
                 $"Нельзя установить {totalSeats} мест: уже занято {occupiedSeats}");
 
         Title = title;
@@ -83,15 +80,7 @@ public class Event : IValidatableObject
         AvailableSeats = totalSeats - occupiedSeats;
     }
 
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        foreach (var (field, message) in GetErrors(Title, Description, StartAt, EndAt, TotalSeats))
-        {
-            yield return new ValidationResult(message, [field]);
-        }
-    }
-
-    // Единый набор правил: используется и фабрикой Create, и валидацией модели
+    // Единый набор доменных правил для создания и обновления события.
     private static IEnumerable<(string Field, string Message)> GetErrors(
         string? title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
     {
@@ -129,8 +118,8 @@ public class Event : IValidatableObject
         }
     }
 
-    // Даты без смещения трактуются как UTC; локальные даты приводятся к UTC.
-    internal static DateTime ToUtc(DateTime value) => value.Kind switch
+    /// <summary>Даты без смещения трактуются как UTC; локальные даты приводятся к UTC.</summary>
+    public static DateTime ToUtc(DateTime value) => value.Kind switch
     {
         DateTimeKind.Local => value.ToUniversalTime(),
         DateTimeKind.Unspecified => DateTime.SpecifyKind(value, DateTimeKind.Utc),

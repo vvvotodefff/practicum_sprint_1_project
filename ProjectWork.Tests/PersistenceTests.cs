@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using ProjectWork.DataAccess;
 using ProjectWork.DTO;
-using ProjectWork.Models;
+using ProjectWork.Domain.Entities;
 using ProjectWork.Services;
 
 namespace ProjectWork.Tests;

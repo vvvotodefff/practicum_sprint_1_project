@@ -1,6 +1,6 @@
 using ProjectWork.DataAccess.Repositories;
-using ProjectWork.Exceptions;
-using ProjectWork.Models;
+using ProjectWork.Domain.Exceptions;
+using ProjectWork.Domain.Entities;
 
 namespace ProjectWork.Services;
 

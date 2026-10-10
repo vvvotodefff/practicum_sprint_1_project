@@ -1,4 +1,4 @@
-namespace ProjectWork.Exceptions;
+namespace ProjectWork.Domain.Exceptions;
 
 /// <summary>
 /// Бросается, когда на событии не осталось свободных мест

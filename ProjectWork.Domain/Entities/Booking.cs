@@ -1,6 +1,4 @@
-using System.Text.Json.Serialization;
-
-namespace ProjectWork.Models;
+namespace ProjectWork.Domain.Entities;
 
 /// <summary>
 /// Бронирование места на событии
@@ -9,7 +7,6 @@ public class Booking
 {
     private Booking() { }
 
-    [JsonIgnore]
     public Event Event { get; private set; } = null!;
 
     public static Booking Create(Guid eventId) => new()

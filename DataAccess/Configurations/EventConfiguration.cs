@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using ProjectWork.Models;
+using ProjectWork.Domain.Entities;
 
 namespace ProjectWork.DataAccess;
 

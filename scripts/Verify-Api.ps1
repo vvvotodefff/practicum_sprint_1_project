@@ -64,6 +64,7 @@ function New-TestEvent([int]$seats) {
     Assert-Check ($result.Code -eq 201) "Create failed: $($result.Response.Content)"
     $createdIds.Add([string]$result.Json.id)
     Assert-Check ($result.Response.Headers.Location -match "/events/$($result.Json.id)") 'Invalid Location'
+    Assert-Check ($null -eq $result.Json.PSObject.Properties['bookings']) 'Event response leaks navigation properties'
     return $result.Json
 }
 
@@ -89,6 +90,9 @@ try {
         endAt = '2026-11-01T12:00:00Z'; totalSeats = 1
     }
     Assert-Check ($invalid.Code -eq 400) 'Invalid dates must return 400'
+    Assert-Check ($invalid.Json.status -eq 400) 'Domain validation must return Problem Details with status 400'
+    $missingDates = Request POST '/events' @{ title = 'Missing dates'; totalSeats = 1 }
+    Assert-Check ($missingDates.Code -eq 400) 'Missing dates must return 400'
     Assert-Check ((Request POST '/events' @{ title = 'Missing fields' }).Code -eq 400) 'Missing fields must return 400'
     $missing = [guid]::NewGuid()
     Assert-Check ((Request GET "/events/$missing").Code -eq 404) 'Missing event must return 404'
@@ -107,7 +111,12 @@ try {
             $response = $task.GetAwaiter().GetResult()
             try {
                 $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-                if ([int]$response.StatusCode -eq 202) { $accepted.Add(($body | ConvertFrom-Json)) }
+                if ([int]$response.StatusCode -eq 202) {
+                    $bookingDto = $body | ConvertFrom-Json
+                    $accepted.Add($bookingDto)
+                    Assert-Check ($null -eq $bookingDto.PSObject.Properties['event']) 'Booking response leaks navigation properties'
+                    Assert-Check ($response.Headers.Location.ToString() -match "/bookings/$($bookingDto.id)") 'Invalid booking Location'
+                }
                 elseif ([int]$response.StatusCode -eq 409) { $conflicts++ }
                 else { throw "Booking failed: $($response.StatusCode) $body" }
             } finally { $response.Dispose() }
@@ -115,7 +124,16 @@ try {
         Assert-Check ($accepted.Count -eq 5 -and $conflicts -eq 15) 'Concurrent bookings exceeded seats or failed'
     } finally { $client.Dispose() }
 
-    Assert-Check ((Request GET "/events/$($event.id)").Json.availableSeats -eq 0) 'Seat counter not saved'
+    $savedEvent = Request GET "/events/$($event.id)"
+    Assert-Check ($savedEvent.Code -eq 200 -and $savedEvent.Json.availableSeats -eq 0) 'Seat counter not saved'
+    Assert-Check ($null -eq $savedEvent.Json.PSObject.Properties['bookings']) 'GET event leaks navigation properties'
+    $invalidUpdate = Request PUT "/events/$($event.id)" @{
+        title = 'Invalid capacity'; startAt = '2026-11-01T12:00:00Z'
+        endAt = '2026-11-01T13:00:00Z'; totalSeats = 4
+    }
+    Assert-Check ($invalidUpdate.Code -eq 400) 'Capacity below occupied seats must return 400'
+    $unchanged = Request GET "/events/$($event.id)"
+    Assert-Check ($unchanged.Json.title -eq $event.title -and $unchanged.Json.totalSeats -eq 5) 'Invalid update changed the event'
     $updated = Request PUT "/events/$($event.id)" @{
         title = $event.title; startAt = '2026-11-01T12:00:00Z'
         endAt = '2026-11-01T13:00:00Z'; totalSeats = 7
@@ -125,6 +143,7 @@ try {
     $filter = [uri]::EscapeDataString($event.title.ToUpperInvariant())
     $page = Request GET "/events?title=$filter&page=1&pageSize=10&from=2026-11-01T00:00:00Z"
     Assert-Check ($page.Code -eq 200 -and $page.Json.totalCount -eq 1) 'SQL filters or pagination failed'
+    Assert-Check ($null -eq $page.Json.items[0].PSObject.Properties['bookings']) 'Event page leaks navigation properties'
 
     $restartEvent = New-TestEvent 1
     $pending = Request POST "/events/$($restartEvent.id)/book"
@@ -140,10 +159,11 @@ try {
     }
     Assert-Check ($booking.Code -eq 200 -and $booking.Json.status -eq 'Confirmed') 'Pending booking not processed after restart'
     Assert-Check ($null -ne $booking.Json.processedAt) 'Processing timestamp missing'
+    Assert-Check ($null -eq $booking.Json.PSObject.Properties['event']) 'GET booking leaks navigation properties'
     Assert-Check ((Request DELETE "/events/$($event.id)").Code -eq 204) 'Delete failed'
     $createdIds.Remove([string]$event.id) | Out-Null
     Assert-Check ((Request GET "/bookings/$($accepted[0].id)").Code -eq 404) 'Cascade delete failed'
-    Write-Output 'PASS: Swagger, validation, CRUD, SQL filters, 20 concurrent bookings, restart and cascade delete.'
+    Write-Output 'PASS: Swagger, DTO contracts, domain validation, CRUD, SQL filters, 20 concurrent bookings, restart and cascade delete.'
 }
 finally {
     foreach ($id in $createdIds) {

@@ -1,4 +1,4 @@
-using ProjectWork.Models;
+using ProjectWork.Domain.Entities;
 
 namespace ProjectWork.DataAccess.Repositories;
 

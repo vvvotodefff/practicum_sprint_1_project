@@ -1,5 +1,5 @@
 using ProjectWork.DataAccess.Repositories;
-using ProjectWork.Models;
+using ProjectWork.Domain.Entities;
 
 namespace ProjectWork.Services;
 

@@ -25,7 +25,7 @@ namespace ProjectWork.DataAccess.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("ProjectWork.Models.Booking", b =>
+            modelBuilder.Entity("ProjectWork.Domain.Entities.Booking", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -58,7 +58,7 @@ namespace ProjectWork.DataAccess.Migrations
                     b.ToTable("bookings", (string)null);
                 });
 
-            modelBuilder.Entity("ProjectWork.Models.Event", b =>
+            modelBuilder.Entity("ProjectWork.Domain.Entities.Event", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -103,9 +103,9 @@ namespace ProjectWork.DataAccess.Migrations
                         });
                 });
 
-            modelBuilder.Entity("ProjectWork.Models.Booking", b =>
+            modelBuilder.Entity("ProjectWork.Domain.Entities.Booking", b =>
                 {
-                    b.HasOne("ProjectWork.Models.Event", "Event")
+                    b.HasOne("ProjectWork.Domain.Entities.Event", "Event")
                         .WithMany("Bookings")
                         .HasForeignKey("EventId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -114,7 +114,7 @@ namespace ProjectWork.DataAccess.Migrations
                     b.Navigation("Event");
                 });
 
-            modelBuilder.Entity("ProjectWork.Models.Event", b =>
+            modelBuilder.Entity("ProjectWork.Domain.Entities.Event", b =>
                 {
                     b.Navigation("Bookings");
                 });

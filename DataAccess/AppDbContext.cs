@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using ProjectWork.Models;
+using ProjectWork.Domain.Entities;
 
 namespace ProjectWork.DataAccess;
 

@@ -1,9 +1,21 @@
 # Сервис управления мероприятиями
 
-Учебный ASP.NET Core Web API, проектная работа шестого спринта.
+Учебный ASP.NET Core Web API. В седьмом спринте выполняется разделение на слои;
+на текущем этапе завершён перенос предметной области в Domain (этап 3).
 События и бронирования хранятся в PostgreSQL через Entity Framework Core.
 Сервисы работают через репозитории, а схема БД управляется миграциями EF Core.
 После перезапуска API данные сохраняются.
+
+`ProjectWork.Domain` — отдельная библиотека с `Event`, `Booking`, `BookingStatus`
+и доменными исключениями. Она не зависит от других проектов, EF Core, ASP.NET Core,
+JSON-сериализации или DataAnnotations. Правила создания и обновления проверяют
+сами сущности, ошибки передаются через `DomainValidationException` и преобразуются
+в HTTP 400 в middleware. Контроллеры возвращают `EventInfo` и `BookingInfo` без
+навигационных свойств, поэтому формат JSON не зависит от графа сущностей.
+
+Библиотеки Application и Infrastructure пока содержат только настройки зависимостей.
+Сервисы, интерфейсы репозиториев, DTO и EF-код ещё находятся в веб-проекте:
+их перенос относится к следующим этапам. `PaginatedResult<T>` пока остаётся в Models.
 
 ## Требования и запуск
 
@@ -214,8 +226,10 @@ dotnet test
 
 В решении два тестовых проекта:
 
-- `ProjectWork.Tests` — 74 юнит-теста с EF Core InMemory, Docker не нужен.
-  Проверяются доменные правила, сервисы, конкурентность и фоновая обработка.
+- `ProjectWork.Tests` — 108 юнит-тестов, Docker не нужен.
+  Проверяются доменные правила Create/Update, UTC, сервисы, конкурентность,
+  фоновая обработка, DTO-контракты ответов и HTTP-маппинг доменных исключений.
+  Для тестов доступа к данным используется EF Core InMemory.
   `TestDatabase` создаёт уникальную БД на экземпляр тестового класса;
   каждый конкурентный запрос использует собственный scope и контекст.
 - `ProjectWork.IntegrationTests` — 81 интеграционный тест с настоящей PostgreSQL 16
@@ -238,7 +252,7 @@ dotnet test --filter "Category=Integration"
 `MigrateAsync()`; тесты коллекции не выполняются параллельно. Рабочая БД из
 `appsettings.json` не затрагивается. После прогона контейнер удаляется.
 Подробности: [интеграционные тесты](ProjectWork.IntegrationTests/README.md).
-Результаты итогового прогона: [чек-лист шестого спринта](docs/sprint-6-checklist.md).
+Архив результатов шестого спринта: [чек-лист](docs/sprint-6-checklist.md).
 
 После сборки можно выполнить автоматическую HTTP-проверку реального PostgreSQL:
 
@@ -259,13 +273,16 @@ pwsh -File scripts/Verify-Api.ps1
 ```text
 Controllers/                HTTP-эндпоинты
 DTO/                        Контракты запросов и ответов
-Models/                     Event, Booking и доменные правила
+Models/                     PaginatedResult<T> (до этапа переноса в Application)
+ProjectWork.Domain/Entities/ Event, Booking, BookingStatus и доменные правила
+ProjectWork.Domain/Exceptions/ Доменные исключения
+ProjectWork.Application/    Библиотека для следующего этапа, ссылка на Domain
+ProjectWork.Infrastructure/ Библиотека для следующего этапа, ссылки на Application и Domain
 DataAccess/                 AppDbContext
 DataAccess/Configurations/  Маппинг таблиц и связей через Fluent API
 DataAccess/Repositories/    Интерфейсы и реализации репозиториев
 DataAccess/Migrations/      InitialCreate и снимок модели EF Core
 Services/                   Бизнес-логика, общий семафор записи и фоновая обработка
-Exceptions/                 Доменные исключения
 Middleware/                 Преобразование исключений в Problem Details
 ProjectWork.Tests/          xUnit и EF Core InMemory
 ProjectWork.IntegrationTests/ xUnit и PostgreSQL через Testcontainers

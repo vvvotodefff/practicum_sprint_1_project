@@ -1,4 +1,5 @@
 using ProjectWork.DTO;
+using ProjectWork.Domain.Entities;
 using ProjectWork.Models;
 
 namespace ProjectWork.Services;
@@ -14,7 +15,7 @@ public interface IEventService
     Task<Event?> GetEventByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Создать событие из данных запроса. Бросает ValidationException, если данные некорректны.
+    /// Создать событие из данных запроса. Бросает DomainValidationException, если данные некорректны.
     /// </summary>
     Task<EventInfo> CreateEventAsync(CreateEvent request, CancellationToken cancellationToken = default);
 
