@@ -85,6 +85,8 @@ try {
         }
     }
     Assert-Check ((Request GET '/swagger/index.html').Code -eq 200) 'Swagger UI unavailable'
+    Assert-Check (-not [string]::IsNullOrWhiteSpace($swagger.components.schemas.EventInfo.properties.title.description)) 'EventInfo XML documentation missing after moving DTOs'
+    Assert-Check (-not [string]::IsNullOrWhiteSpace($swagger.components.schemas.UpdateEvent.properties.totalSeats.description)) 'UpdateEvent XML documentation missing after moving DTOs'
     $invalid = Request POST '/events' @{
         title = 'Invalid'; startAt = '2026-11-01T13:00:00Z'
         endAt = '2026-11-01T12:00:00Z'; totalSeats = 1

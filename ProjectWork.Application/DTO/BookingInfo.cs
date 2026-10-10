@@ -1,6 +1,6 @@
 using ProjectWork.Domain.Entities;
 
-namespace ProjectWork.DTO;
+namespace ProjectWork.Application.DTO;
 
 /// <summary>Состояние бронирования без навигационных свойств доменной сущности.</summary>
 public class BookingInfo

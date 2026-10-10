@@ -1,4 +1,4 @@
-namespace ProjectWork.Models;
+namespace ProjectWork.Application.Common;
 
 /// <summary>
 /// Страница результатов с информацией о пагинации

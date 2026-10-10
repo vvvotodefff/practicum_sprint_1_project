@@ -1,7 +1,8 @@
 # Сервис управления мероприятиями
 
 Учебный ASP.NET Core Web API. В седьмом спринте выполняется разделение на слои;
-на текущем этапе завершён перенос предметной области в Domain (этап 3).
+на текущем этапе завершены перенос предметной области в Domain (этап 3)
+и перенос прикладной логики в Application (этап 4).
 События и бронирования хранятся в PostgreSQL через Entity Framework Core.
 Сервисы работают через репозитории, а схема БД управляется миграциями EF Core.
 После перезапуска API данные сохраняются.
@@ -13,9 +14,15 @@ JSON-сериализации или DataAnnotations. Правила созда�
 в HTTP 400 в middleware. Контроллеры возвращают `EventInfo` и `BookingInfo` без
 навигационных свойств, поэтому формат JSON не зависит от графа сущностей.
 
-Библиотеки Application и Infrastructure пока содержат только настройки зависимостей.
-Сервисы, интерфейсы репозиториев, DTO и EF-код ещё находятся в веб-проекте:
-их перенос относится к следующим этапам. `PaginatedResult<T>` пока остаётся в Models.
+`ProjectWork.Application` содержит сервисы, их интерфейсы, интерфейсы репозиториев,
+DTO, `PaginatedResult<T>` и общий семафор записи `EventWriteLock`.
+Библиотека зависит только от Domain, без ссылок на Infrastructure, EF Core и ASP.NET Core.
+XML-комментарии DTO подключены к Swagger из сборки Application.
+
+Infrastructure пока содержит только настройки зависимостей. Реализации репозиториев,
+EF-код и фоновый сервис `BookingProcessingService` ещё находятся в веб-проекте;
+их перенос относится к этапу 5. Фоновый сервис через scope обращается к интерфейсам
+из Application, а HTTP-контракты и регистрация Scoped-сервисов сохраняются.
 
 ## Требования и запуск
 
@@ -272,17 +279,18 @@ pwsh -File scripts/Verify-Api.ps1
 
 ```text
 Controllers/                HTTP-эндпоинты
-DTO/                        Контракты запросов и ответов
-Models/                     PaginatedResult<T> (до этапа переноса в Application)
 ProjectWork.Domain/Entities/ Event, Booking, BookingStatus и доменные правила
 ProjectWork.Domain/Exceptions/ Доменные исключения
-ProjectWork.Application/    Библиотека для следующего этапа, ссылка на Domain
+ProjectWork.Application/Abstractions/Repositories/ Интерфейсы репозиториев
+ProjectWork.Application/Services/ Сервисы, их интерфейсы и общий семафор записи
+ProjectWork.Application/DTO/ Контракты запросов и ответов
+ProjectWork.Application/Common/ PaginatedResult<T>
 ProjectWork.Infrastructure/ Библиотека для следующего этапа, ссылки на Application и Domain
 DataAccess/                 AppDbContext
 DataAccess/Configurations/  Маппинг таблиц и связей через Fluent API
-DataAccess/Repositories/    Интерфейсы и реализации репозиториев
+DataAccess/Repositories/    Реализации репозиториев (до этапа 5)
 DataAccess/Migrations/      InitialCreate и снимок модели EF Core
-Services/                   Бизнес-логика, общий семафор записи и фоновая обработка
+Services/                   Фоновая обработка (до этапа 5)
 Middleware/                 Преобразование исключений в Problem Details
 ProjectWork.Tests/          xUnit и EF Core InMemory
 ProjectWork.IntegrationTests/ xUnit и PostgreSQL через Testcontainers

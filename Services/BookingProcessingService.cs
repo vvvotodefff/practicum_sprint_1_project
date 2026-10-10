@@ -1,4 +1,5 @@
-using ProjectWork.DataAccess.Repositories;
+using ProjectWork.Application.Abstractions.Repositories;
+using ProjectWork.Application.Services;
 using ProjectWork.Domain.Entities;
 
 namespace ProjectWork.Services;

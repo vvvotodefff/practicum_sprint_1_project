@@ -1,10 +1,10 @@
-using ProjectWork.DataAccess.Repositories;
-using ProjectWork.DTO;
+using ProjectWork.Application.Abstractions.Repositories;
+using ProjectWork.Application.DTO;
 using ProjectWork.Domain.Exceptions;
 using ProjectWork.Domain.Entities;
-using ProjectWork.Models;
+using ProjectWork.Application.Common;
 
-namespace ProjectWork.Services;
+namespace ProjectWork.Application.Services;
 
 public class EventService(IEventRepository eventRepository) : IEventService
 {

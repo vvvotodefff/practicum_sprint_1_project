@@ -49,5 +49,9 @@
     <ProjectReference Include="ProjectWork.Application\ProjectWork.Application.csproj" />
     <ProjectReference Include="ProjectWork.Infrastructure\ProjectWork.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="DTO\" />
+    <Folder Include="Models\" />
+  </ItemGroup>
 
 </Project>

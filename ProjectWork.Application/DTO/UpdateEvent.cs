@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace ProjectWork.DTO
+namespace ProjectWork.Application.DTO
 {
     /// <summary>
     /// Данные для обновления события. Количество свободных мест сервер считает сам

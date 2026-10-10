@@ -7,10 +7,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using ProjectWork.Controllers;
 using ProjectWork.Domain.Entities;
 using ProjectWork.Domain.Exceptions;
-using ProjectWork.DTO;
+using ProjectWork.Application.DTO;
 using ProjectWork.Middleware;
-using ProjectWork.Models;
-using ProjectWork.Services;
+using ProjectWork.Application.Common;
+using ProjectWork.Application.Services;
 
 namespace ProjectWork.Tests;
 

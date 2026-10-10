@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using ProjectWork.Application.Abstractions.Repositories;
 using ProjectWork.DataAccess;
 using ProjectWork.DataAccess.Repositories;
-using ProjectWork.Services;
+using ProjectWork.Application.Services;
 
 namespace ProjectWork.Tests;
 

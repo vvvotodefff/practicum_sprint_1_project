@@ -1,6 +1,6 @@
 using ProjectWork.Domain.Entities;
 
-namespace ProjectWork.DTO
+namespace ProjectWork.Application.DTO
 {
     /// <summary>
     /// Информация о событии, которую возвращает API

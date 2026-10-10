@@ -1,6 +1,6 @@
 using ProjectWork.Domain.Entities;
 
-namespace ProjectWork.DataAccess.Repositories;
+namespace ProjectWork.Application.Abstractions.Repositories;
 
 /// <summary>Доступ к бронированиям без правил перехода между статусами.</summary>
 public interface IBookingRepository

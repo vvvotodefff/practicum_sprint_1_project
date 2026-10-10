@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using ProjectWork.DataAccess;
-using ProjectWork.DataAccess.Repositories;
+using ProjectWork.Application.Abstractions.Repositories;
 using ProjectWork.Domain.Entities;
 
 namespace ProjectWork.IntegrationTests;

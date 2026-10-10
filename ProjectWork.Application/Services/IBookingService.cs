@@ -1,6 +1,6 @@
 using ProjectWork.Domain.Entities;
 
-namespace ProjectWork.Services;
+namespace ProjectWork.Application.Services;
 
 /// <summary>Асинхронное создание, чтение и обработка бронирований.</summary>
 public interface IBookingService

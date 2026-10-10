@@ -1,5 +1,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using ProjectWork.Application.Abstractions.Repositories;
+using ProjectWork.Application.Services;
 using ProjectWork.DataAccess;
 using ProjectWork.DataAccess.Repositories;
 using ProjectWork.Services;
@@ -14,6 +16,8 @@ builder.Services.AddSwaggerGen(options =>
 {
     var xmlFilename = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
+    var applicationXmlFilename = $"{typeof(IEventService).Assembly.GetName().Name}.xml";
+    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, applicationXmlFilename));
 });
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")

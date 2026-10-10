@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using ProjectWork.Domain.Exceptions;
-using ProjectWork.DTO;
-using ProjectWork.Services;
+using ProjectWork.Application.DTO;
+using ProjectWork.Application.Services;
 
 namespace ProjectWork.Controllers
 {

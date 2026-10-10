@@ -1,8 +1,8 @@
-using ProjectWork.DataAccess.Repositories;
+using ProjectWork.Application.Abstractions.Repositories;
 using ProjectWork.Domain.Exceptions;
 using ProjectWork.Domain.Entities;
 
-namespace ProjectWork.Services;
+namespace ProjectWork.Application.Services;
 
 public class BookingService(IEventRepository eventRepository, IBookingRepository bookingRepository) : IBookingService
 {

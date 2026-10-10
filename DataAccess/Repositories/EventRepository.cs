@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectWork.Application.Abstractions.Repositories;
 using ProjectWork.Domain.Entities;
-using ProjectWork.Models;
+using ProjectWork.Application.Common;
 
 namespace ProjectWork.DataAccess.Repositories;
 

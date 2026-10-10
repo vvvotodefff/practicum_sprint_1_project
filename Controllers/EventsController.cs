@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
-using ProjectWork.DTO;
-using ProjectWork.Services;
-using ProjectWork.Models;
+using ProjectWork.Application.DTO;
+using ProjectWork.Application.Services;
+using ProjectWork.Application.Common;
 using ProjectWork.Domain.Exceptions;
 
 namespace ProjectWork.Controllers

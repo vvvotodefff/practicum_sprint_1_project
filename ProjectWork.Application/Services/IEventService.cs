@@ -1,8 +1,8 @@
-using ProjectWork.DTO;
+using ProjectWork.Application.DTO;
 using ProjectWork.Domain.Entities;
-using ProjectWork.Models;
+using ProjectWork.Application.Common;
 
-namespace ProjectWork.Services;
+namespace ProjectWork.Application.Services;
 
 /// <summary>Асинхронные операции с событиями и количеством свободных мест.</summary>
 public interface IEventService

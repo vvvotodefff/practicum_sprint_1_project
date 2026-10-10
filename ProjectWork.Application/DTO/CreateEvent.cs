@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace ProjectWork.DTO
+namespace ProjectWork.Application.DTO
 {
     public class CreateEvent
     {

@@ -1,7 +1,7 @@
 using ProjectWork.Domain.Entities;
-using ProjectWork.Models;
+using ProjectWork.Application.Common;
 
-namespace ProjectWork.DataAccess.Repositories;
+namespace ProjectWork.Application.Abstractions.Repositories;
 
 /// <summary>Доступ к событиям без бизнес-правил бронирования.</summary>
 public interface IEventRepository
