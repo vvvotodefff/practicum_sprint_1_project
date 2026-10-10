@@ -1,8 +1,8 @@
 # Сервис управления мероприятиями
 
 Учебный ASP.NET Core Web API. В седьмом спринте выполняется разделение на слои;
-на текущем этапе завершены перенос предметной области в Domain (этап 3)
-и перенос прикладной логики в Application (этап 4).
+на текущем этапе завершены перенос предметной области в Domain (этап 3),
+прикладной логики в Application (этап 4) и инфраструктуры в Infrastructure (этап 5).
 События и бронирования хранятся в PostgreSQL через Entity Framework Core.
 Сервисы работают через репозитории, а схема БД управляется миграциями EF Core.
 После перезапуска API данные сохраняются.
@@ -19,10 +19,19 @@ DTO, `PaginatedResult<T>` и общий семафор записи `EventWriteL
 Библиотека зависит только от Domain, без ссылок на Infrastructure, EF Core и ASP.NET Core.
 XML-комментарии DTO подключены к Swagger из сборки Application.
 
-Infrastructure пока содержит только настройки зависимостей. Реализации репозиториев,
-EF-код и фоновый сервис `BookingProcessingService` ещё находятся в веб-проекте;
-их перенос относится к этапу 5. Фоновый сервис через scope обращается к интерфейсам
-из Application, а HTTP-контракты и регистрация Scoped-сервисов сохраняются.
+`ProjectWork.Infrastructure` содержит `AppDbContext`, Fluent API-конфигурации,
+существующие миграции, реализации репозиториев и `BookingProcessingService`.
+Зависит от Application и Domain, но не от веб-проекта. EF Core, Npgsql и абстракции
+фонового выполнения подключены здесь; фоновый сервис через `IServiceScopeFactory`
+обращается к интерфейсам Application.
+
+`AddInfrastructureServices(configuration)` регистрирует контекст и репозитории
+как Scoped, а фоновый сервис — как Hosted Service. Метод вызывается из `Program.cs`.
+Строка подключения остаётся в конфигурации веб-проекта, её отсутствие проверяется
+при регистрации. HTTP-контракты и правила бронирования не изменены.
+
+Следующие этапы — завершить настройку Presentation и уточнить ссылки тестовых
+проектов на слои. Пока тестовые проекты сохраняют ссылку на веб-проект.
 
 ## Требования и запуск
 
@@ -90,19 +99,26 @@ dotnet tool install --global dotnet-ef --version 10.0.12
 
 ```bash
 # Посмотреть миграции и применить их без запуска API
-dotnet ef migrations list --project ProjectWork.csproj --startup-project ProjectWork.csproj
-dotnet ef database update --project ProjectWork.csproj --startup-project ProjectWork.csproj
+dotnet ef migrations list --project ProjectWork.Infrastructure/ProjectWork.Infrastructure.csproj --startup-project ProjectWork.csproj
+dotnet ef database update --project ProjectWork.Infrastructure/ProjectWork.Infrastructure.csproj --startup-project ProjectWork.csproj
 
 # Проверить, не разошлись ли модель и снимок миграции
-dotnet ef migrations has-pending-model-changes --project ProjectWork.csproj --startup-project ProjectWork.csproj
+dotnet ef migrations has-pending-model-changes --project ProjectWork.Infrastructure/ProjectWork.Infrastructure.csproj --startup-project ProjectWork.csproj
 
 # Только после изменения модели: создать НОВУЮ миграцию с осмысленным именем
-dotnet ef migrations add DescribeModelChange --project ProjectWork.csproj --startup-project ProjectWork.csproj --output-dir DataAccess/Migrations
+dotnet ef migrations add DescribeModelChange --project ProjectWork.Infrastructure/ProjectWork.Infrastructure.csproj --startup-project ProjectWork.csproj --output-dir Persistence/Migrations
 ```
 
 Последняя команда — пример для дальнейшей разработки, для обычного запуска она не нужна.
 Не создавайте `InitialCreate` повторно. Миграции, их Designer-файлы и
 `AppDbContextModelSnapshot` хранятся в Git вместе с кодом.
+
+`--project` указывает на сборку Infrastructure с контекстом и миграциями,
+`--startup-project` — на веб-проект с настройками запуска и строкой подключения.
+Путь `--output-dir` считается от Infrastructure. Пакет `Microsoft.EntityFrameworkCore.Design`
+оставлен в startup-проекте для работы `dotnet ef`; runtime-пакеты EF Core и Npgsql
+перенесены в Infrastructure. Начальная миграция перенесена вместе с Designer и снимком
+модели без изменения идентификатора и операций: существующую базу пересоздавать не нужно.
 
 `EnsureCreated` больше не используется и не должен смешиваться с миграциями.
 Если у вас осталась старая БД, созданная через `EnsureCreated`, перед переходом
@@ -233,9 +249,11 @@ dotnet test
 
 В решении два тестовых проекта:
 
-- `ProjectWork.Tests` — 108 юнит-тестов, Docker не нужен.
+- `ProjectWork.Tests` — 114 юнит-тестов, Docker не нужен.
   Проверяются доменные правила Create/Update, UTC, сервисы, конкурентность,
   фоновая обработка, DTO-контракты ответов и HTTP-маппинг доменных исключений.
+  Дополнительно проверяются регистрация Infrastructure, Scoped lifetime, фоновый
+  сервис, настройки PostgreSQL и обнаружение миграций без соединения с БД.
   Для тестов доступа к данным используется EF Core InMemory.
   `TestDatabase` создаёт уникальную БД на экземпляр тестового класса;
   каждый конкурентный запрос использует собственный scope и контекст.
@@ -285,12 +303,12 @@ ProjectWork.Application/Abstractions/Repositories/ Интерфейсы репо
 ProjectWork.Application/Services/ Сервисы, их интерфейсы и общий семафор записи
 ProjectWork.Application/DTO/ Контракты запросов и ответов
 ProjectWork.Application/Common/ PaginatedResult<T>
-ProjectWork.Infrastructure/ Библиотека для следующего этапа, ссылки на Application и Domain
-DataAccess/                 AppDbContext
-DataAccess/Configurations/  Маппинг таблиц и связей через Fluent API
-DataAccess/Repositories/    Реализации репозиториев (до этапа 5)
-DataAccess/Migrations/      InitialCreate и снимок модели EF Core
-Services/                   Фоновая обработка (до этапа 5)
+ProjectWork.Infrastructure/Persistence/ AppDbContext
+ProjectWork.Infrastructure/Persistence/Configurations/ Маппинг через Fluent API
+ProjectWork.Infrastructure/Persistence/Migrations/ InitialCreate и снимок модели
+ProjectWork.Infrastructure/Repositories/ EF Core-реализации репозиториев
+ProjectWork.Infrastructure/BackgroundServices/ Фоновая обработка бронирований
+ProjectWork.Infrastructure/DependencyInjection.cs Регистрация инфраструктуры
 Middleware/                 Преобразование исключений в Problem Details
 ProjectWork.Tests/          xUnit и EF Core InMemory
 ProjectWork.IntegrationTests/ xUnit и PostgreSQL через Testcontainers

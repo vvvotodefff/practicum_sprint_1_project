@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using ProjectWork.Domain.Entities;
 
-namespace ProjectWork.DataAccess;
+namespace ProjectWork.Infrastructure.Persistence.Configurations;
 
 public sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
 {

@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using ProjectWork.DataAccess;
+using ProjectWork.Infrastructure.Persistence;
 using ProjectWork.Application.Abstractions.Repositories;
 
 namespace ProjectWork.IntegrationTests;

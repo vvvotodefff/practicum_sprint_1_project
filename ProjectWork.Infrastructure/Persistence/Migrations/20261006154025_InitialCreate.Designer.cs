@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using ProjectWork.DataAccess;
+using ProjectWork.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace ProjectWork.DataAccess.Migrations
+namespace ProjectWork.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     [Migration("20261006154025_InitialCreate")]

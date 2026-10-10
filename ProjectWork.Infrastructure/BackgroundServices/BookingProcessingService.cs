@@ -1,8 +1,11 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using ProjectWork.Application.Abstractions.Repositories;
 using ProjectWork.Application.Services;
 using ProjectWork.Domain.Entities;
 
-namespace ProjectWork.Services;
+namespace ProjectWork.Infrastructure.BackgroundServices;
 
 /// <summary>Каждая фоновая задача получает собственный scope и DbContext.</summary>
 public class BookingProcessingService(

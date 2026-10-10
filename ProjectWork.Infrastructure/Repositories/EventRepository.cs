@@ -2,8 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using ProjectWork.Application.Abstractions.Repositories;
 using ProjectWork.Domain.Entities;
 using ProjectWork.Application.Common;
+using ProjectWork.Infrastructure.Persistence;
 
-namespace ProjectWork.DataAccess.Repositories;
+namespace ProjectWork.Infrastructure.Repositories;
 
 /// <summary>Запросы и сохранение событий через EF Core.</summary>
 public sealed class EventRepository(AppDbContext context) : IEventRepository
