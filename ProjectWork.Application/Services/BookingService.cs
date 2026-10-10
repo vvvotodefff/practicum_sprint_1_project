@@ -4,17 +4,24 @@ using ProjectWork.Domain.Entities;
 
 namespace ProjectWork.Application.Services;
 
+/// <summary>Прикладные операции с бронированиями и количеством свободных мест.</summary>
+/// <param name="eventRepository">Доступ к событиям в текущем scope.</param>
+/// <param name="bookingRepository">Доступ к бронированиям в том же scope.</param>
 public class BookingService(IEventRepository eventRepository, IBookingRepository bookingRepository) : IBookingService
 {
+    /// <inheritdoc />
     public Task<List<Booking>> GetBookingsAsync(CancellationToken cancellationToken = default) =>
         bookingRepository.GetAllAsync(cancellationToken: cancellationToken);
 
+    /// <inheritdoc />
     public Task<Booking?> GetBookingByIdAsync(Guid bookingId, CancellationToken cancellationToken = default) =>
         bookingRepository.GetByIdAsync(bookingId, cancellationToken);
 
+    /// <inheritdoc />
     public Task<List<Booking>> GetPendingBookingsAsync(CancellationToken cancellationToken = default) =>
         bookingRepository.GetAllAsync(BookingStatus.Pending, cancellationToken);
 
+    /// <inheritdoc />
     public async Task<Booking> CreateBookingAsync(Guid eventId, CancellationToken cancellationToken = default)
     {
         await EventWriteLock.Gate.WaitAsync(cancellationToken);
@@ -33,6 +40,7 @@ public class BookingService(IEventRepository eventRepository, IBookingRepository
         finally { EventWriteLock.Gate.Release(); }
     }
 
+    /// <inheritdoc />
     public async Task<bool> MarkAsProcessedAsync(Guid bookingId, BookingStatus status,
         CancellationToken cancellationToken = default)
     {

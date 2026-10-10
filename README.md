@@ -1,12 +1,14 @@
 # Сервис управления мероприятиями
 
-Учебный ASP.NET Core Web API. В седьмом спринте выполняется разделение на слои;
-на текущем этапе завершены перенос предметной области в Domain (этап 3),
-прикладной логики в Application (этап 4), инфраструктуры в Infrastructure (этап 5)
-и настройка Presentation (этап 6).
+Учебный ASP.NET Core Web API. В седьмом спринте проект разделён на четыре
+производственные сборки: Domain, Application, Infrastructure и Presentation.
+Тестовые проекты ссылаются на проверяемые слои, HTTP-тесты выделены отдельно.
 События и бронирования хранятся в PostgreSQL через Entity Framework Core.
 Сервисы работают через репозитории, а схема БД управляется миграциями EF Core.
 После перезапуска API данные сохраняются.
+
+[Репозиторий на GitHub](https://github.com/vvvotodefff/practicum_sprint_1_project).
+Результаты итоговой проверки: [чек-лист седьмого спринта](docs/sprint-7-checklist.md).
 
 `ProjectWork.Domain` — отдельная библиотека с `Event`, `Booking`, `BookingStatus`
 и доменными исключениями. Она не зависит от других проектов, EF Core, ASP.NET Core,
@@ -44,8 +46,20 @@ XML-комментарии DTO подключены к Swagger из сборки
 Регистрация контроллеров, JSON и Swagger находится в `DependencyInjection.cs`
 веб-проекта. В `Program.cs` нет прямой работы с EF Core или `AppDbContext`.
 
-Следующий этап — уточнить ссылки тестовых проектов на слои. Пока тестовые проекты
-сохраняют ссылку на веб-проект; их `ProjectReference` будут обновлены на этапе 7.
+Зависимости проектов заданы через `ProjectReference`:
+
+| Проект | Назначение | Ссылки на проекты |
+|---|---|---|
+| `ProjectWork.Domain` | Сущности, доменные правила и исключения | Нет |
+| `ProjectWork.Application` | Сервисы, DTO, порты репозиториев | Domain |
+| `ProjectWork.Infrastructure` | EF Core, PostgreSQL, репозитории, фоновая обработка | Application, Domain |
+| `ProjectWork` | Presentation: HTTP, middleware, composition root | Application, Infrastructure |
+| `ProjectWork.Tests` | Юнит- и архитектурные тесты | Domain, Application, Infrastructure |
+| `ProjectWork.IntegrationTests` | Репозитории и миграции в PostgreSQL | Domain, Application, Infrastructure |
+| `ProjectWork.PresentationTests` | Контроллеры и HTTP-маппинг ошибок | Presentation и используемые при проверке слои |
+
+Только HTTP-тестам нужна ссылка на веб-проект. Общие и интеграционные тесты
+больше не зависят от Presentation, в том числе в скомпилированных runtime-зависимостях.
 
 ## Требования и запуск
 
@@ -192,7 +206,7 @@ docker compose stop postgres
    ```json
    {
      "title": "Встреча команды",
-     "description": "Обсуждение шестого спринта",
+     "description": "Обсуждение седьмого спринта",
      "startAt": "2026-11-01T12:00:00Z",
      "endAt": "2026-11-01T13:00:00Z",
      "totalSeats": 3
@@ -268,25 +282,34 @@ Fluent API конфигурации автоматически подключа�
 dotnet test
 ```
 
-В решении два тестовых проекта:
+В решении три тестовых проекта, всего 206 тестов:
 
-- `ProjectWork.Tests` — 121 юнит-тест, Docker не нужен.
+- `ProjectWork.Tests` — 112 юнит- и архитектурных тестов, Docker не нужен.
   Проверяются доменные правила Create/Update, UTC, сервисы, конкурентность,
-  фоновая обработка, DTO-контракты ответов и HTTP-маппинг доменных исключений.
+  фоновая обработка и направление зависимостей сборок.
   Дополнительно проверяются регистрация Infrastructure, Scoped lifetime, фоновый
   сервис, настройки PostgreSQL и обнаружение миграций без соединения с БД.
-  Также проверяются регистрация Application, формат ошибок, безопасный ответ `500`,
-  отмена запроса и запрет перезаписи уже начатого ответа.
+  Также проверяются регистрация Application и отсутствие зависимости тестов от Presentation.
   Для тестов доступа к данным используется EF Core InMemory.
   `TestDatabase` создаёт уникальную БД на экземпляр тестового класса;
   каждый конкурентный запрос использует собственный scope и контекст.
 - `ProjectWork.IntegrationTests` — 81 интеграционный тест с настоящей PostgreSQL 16
   через Testcontainers. Проверяются все методы обоих репозиториев, фильтры,
   пагинация, обновление, удаление, транзакции, миграции и ограничения БД.
+- `ProjectWork.PresentationTests` — 13 тестов контроллеров и middleware, Docker не нужен.
+  Проверяются DTO-контракты, статусы и Location, маппинг исключений, безопасный `500`,
+  отмена запроса и запрет перезаписи начатого ответа. Фикстура использует отдельную
+  InMemory-базу; ссылка на Presentation нужна для проверки самих контроллеров и middleware.
 
 ```bash
 # Только юнит-тесты, без Docker
 dotnet test ProjectWork.Tests/ProjectWork.Tests.csproj
+
+# HTTP-слой на InMemory-базе, без Docker
+dotnet test ProjectWork.PresentationTests/ProjectWork.PresentationTests.csproj
+
+# Только направление зависимостей сборок
+dotnet test ProjectWork.Tests/ProjectWork.Tests.csproj --filter FullyQualifiedName~ArchitectureTests
 
 # Только интеграционные тесты, Docker обязателен
 dotnet test ProjectWork.IntegrationTests/ProjectWork.IntegrationTests.csproj
@@ -337,6 +360,7 @@ ProjectWork.Infrastructure/DatabaseInitialization.cs Применение миг
 Middleware/                 Преобразование исключений в Problem Details
 ProjectWork.Tests/          xUnit и EF Core InMemory
 ProjectWork.IntegrationTests/ xUnit и PostgreSQL через Testcontainers
+ProjectWork.PresentationTests/ Контроллеры и middleware, xUnit и InMemory
 scripts/                    Проверка API с настоящей PostgreSQL
 docs/                       Результаты проверки по чек-листу спринта
 docker-compose.yml          Локальная PostgreSQL

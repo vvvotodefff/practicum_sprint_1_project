@@ -6,8 +6,11 @@ using ProjectWork.Application.Common;
 
 namespace ProjectWork.Application.Services;
 
+/// <summary>Прикладные операции с событиями через порт репозитория.</summary>
+/// <param name="eventRepository">Доступ к событиям в текущем scope.</param>
 public class EventService(IEventRepository eventRepository) : IEventService
 {
+    /// <inheritdoc />
     public Task<PaginatedResult<Event>> GetEventsAsync(string? title, DateTime? from,
         DateTime? to, int page, int pageSize, CancellationToken cancellationToken = default) =>
         eventRepository.GetPageAsync(title,
@@ -15,9 +18,11 @@ public class EventService(IEventRepository eventRepository) : IEventService
             to.HasValue ? Event.ToUtc(to.Value) : null,
             page, pageSize, cancellationToken);
 
+    /// <inheritdoc />
     public Task<Event?> GetEventByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         eventRepository.GetByIdAsync(id, cancellationToken);
 
+    /// <inheritdoc />
     public async Task<EventInfo> CreateEventAsync(CreateEvent request, CancellationToken cancellationToken = default)
     {
         var eventItem = Event.Create(request.Title, request.Description,
@@ -26,6 +31,7 @@ public class EventService(IEventRepository eventRepository) : IEventService
         return EventInfo.FromEvent(eventItem);
     }
 
+    /// <inheritdoc />
     public async Task<bool> UpdateEventAsync(Guid id, UpdateEvent request,
         CancellationToken cancellationToken = default)
     {
@@ -42,6 +48,7 @@ public class EventService(IEventRepository eventRepository) : IEventService
         finally { EventWriteLock.Gate.Release(); }
     }
 
+    /// <inheritdoc />
     public async Task<bool> DeleteEventAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await EventWriteLock.Gate.WaitAsync(cancellationToken);
@@ -52,6 +59,7 @@ public class EventService(IEventRepository eventRepository) : IEventService
         finally { EventWriteLock.Gate.Release(); }
     }
 
+    /// <inheritdoc />
     public async Task<bool> TryReserveSeatsAsync(Guid eventId, int count = 1,
         CancellationToken cancellationToken = default)
     {
@@ -67,6 +75,7 @@ public class EventService(IEventRepository eventRepository) : IEventService
         finally { EventWriteLock.Gate.Release(); }
     }
 
+    /// <inheritdoc />
     public async Task ReleaseSeatsAsync(Guid eventId, int count = 1,
         CancellationToken cancellationToken = default)
     {

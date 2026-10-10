@@ -7,12 +7,14 @@ using ProjectWork.Domain.Exceptions;
 
 namespace ProjectWork.Controllers
 {
+    /// <summary>HTTP-операции создания, чтения, обновления и удаления событий.</summary>
     [ApiController]
     [Route("events")]
     public class EventsController : ControllerBase
     {
         private readonly IEventService _eventService;
 
+        /// <summary>Создать контроллер с прикладным сервисом событий.</summary>
         public EventsController(IEventService eventService)
         {
             _eventService = eventService;
