@@ -19,7 +19,7 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.2" />
   </ItemGroup>
 
-  <!-- Тестовые проекты лежат в подпапках — исключаем их файлы из основного проекта -->
+  <!-- Исключаем лишнее из решения-->
   <ItemGroup>
     <Compile Remove="ProjectWork.Tests\**" />
     <Content Remove="ProjectWork.Tests\**" />
@@ -29,6 +29,25 @@
     <Content Remove="ProjectWork.IntegrationTests\**" />
     <None Remove="ProjectWork.IntegrationTests\**" />
     <EmbeddedResource Remove="ProjectWork.IntegrationTests\**" />
+	
+	<Compile Remove="ProjectWork.Domain\**" />
+    <Content Remove="ProjectWork.Domain\**" />
+    <None Remove="ProjectWork.Domain\**" />
+    <EmbeddedResource Remove="ProjectWork.Domain\**" />
+
+    <Compile Remove="ProjectWork.Application\**" />
+    <Content Remove="ProjectWork.Application\**" />
+    <None Remove="ProjectWork.Application\**" />
+    <EmbeddedResource Remove="ProjectWork.Application\**" />
+
+    <Compile Remove="ProjectWork.Infrastructure\**" />
+    <Content Remove="ProjectWork.Infrastructure\**" />
+    <None Remove="ProjectWork.Infrastructure\**" />
+    <EmbeddedResource Remove="ProjectWork.Infrastructure\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="ProjectWork.Application\ProjectWork.Application.csproj" />
+    <ProjectReference Include="ProjectWork.Infrastructure\ProjectWork.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
