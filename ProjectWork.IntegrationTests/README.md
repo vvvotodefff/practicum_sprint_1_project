@@ -13,6 +13,9 @@ dotnet test ProjectWork.IntegrationTests/ProjectWork.IntegrationTests.csproj
 Тесты помечены `Category=Integration`; их можно выбрать через
 `dotnet test --filter "Category=Integration"`.
 
+Проект напрямую ссылается на Domain, Application и Infrastructure, без зависимости
+от веб-проекта. Контекст, репозитории и миграции загружаются из Infrastructure.
+
 ## Изоляция
 
 - `PostgresFixture` реализует `IAsyncLifetime` и поднимает один

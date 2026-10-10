@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
-using ProjectWork.DataAccess;
-using ProjectWork.Models;
+using ProjectWork.Infrastructure;
+using ProjectWork.Infrastructure.Persistence;
+using ProjectWork.Domain.Entities;
 
 namespace ProjectWork.IntegrationTests;
 
@@ -41,7 +42,8 @@ public sealed class MigrationTests(PostgresFixture fixture) : DatabaseTest(fixtu
         var appliedBefore = (await Context.Database.GetAppliedMigrationsAsync()).ToArray();
 
         // Act
-        await Context.Database.MigrateAsync();
+        await using (var startupScope = NewScope())
+            await startupScope.ServiceProvider.MigrateDatabaseAsync();
 
         // Assert
         await using var scope = NewScope();

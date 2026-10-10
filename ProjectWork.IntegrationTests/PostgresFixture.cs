@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using ProjectWork.DataAccess;
-using ProjectWork.DataAccess.Repositories;
+using ProjectWork.Application.Abstractions.Repositories;
+using ProjectWork.Infrastructure.Persistence;
+using ProjectWork.Infrastructure.Repositories;
 using Testcontainers.PostgreSql;
 
 namespace ProjectWork.IntegrationTests;

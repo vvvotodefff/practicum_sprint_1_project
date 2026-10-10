@@ -1,37 +1,17 @@
-using System.Text.Json.Serialization;
-using Microsoft.EntityFrameworkCore;
-using ProjectWork.DataAccess;
-using ProjectWork.DataAccess.Repositories;
-using ProjectWork.Services;
+using ProjectWork;
+using ProjectWork.Application;
+using ProjectWork.Infrastructure;
 using ProjectWork.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers().AddJsonOptions(options =>
-    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-builder.Services.AddProblemDetails();
-builder.Services.AddSwaggerGen(options =>
-{
-    var xmlFilename = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
-});
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("Не задана строка подключения DefaultConnection.")));
-builder.Services.AddScoped<IEventRepository, EventRepository>();
-builder.Services.AddScoped<IBookingRepository, BookingRepository>();
-builder.Services.AddScoped<IEventService, EventService>();
-builder.Services.AddScoped<IBookingService, BookingService>();
-builder.Services.AddHostedService<BookingProcessingService>();
+builder.Services.AddApplicationServices();
+builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddPresentationServices();
 
 var app = builder.Build();
 
-// Миграции создают базу и последовательно обновляют её схему при запуске.
-await using (var scope = app.Services.CreateAsyncScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await context.Database.MigrateAsync();
-}
+await app.Services.MigrateDatabaseAsync();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseStatusCodePages();

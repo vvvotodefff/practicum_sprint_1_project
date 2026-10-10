@@ -1,8 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
-using ProjectWork.DTO;
-using ProjectWork.Exceptions;
-using ProjectWork.Models;
-using ProjectWork.Services;
+using ProjectWork.Application.DTO;
+using ProjectWork.Domain.Exceptions;
+using ProjectWork.Domain.Entities;
+using ProjectWork.Application.Services;
 
 namespace ProjectWork.Tests;
 

@@ -8,18 +8,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
+    <!-- Design нужен dotnet-ef в startup-проекте; runtime-пакеты находятся в Infrastructure. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.2" />
   </ItemGroup>
 
-  <!-- Тестовые проекты лежат в подпапках — исключаем их файлы из основного проекта -->
+  <!-- Исключаем исходники и ресурсы вложенных проектов из веб-проекта. -->
   <ItemGroup>
     <Compile Remove="ProjectWork.Tests\**" />
     <Content Remove="ProjectWork.Tests\**" />
@@ -29,6 +27,29 @@
     <Content Remove="ProjectWork.IntegrationTests\**" />
     <None Remove="ProjectWork.IntegrationTests\**" />
     <EmbeddedResource Remove="ProjectWork.IntegrationTests\**" />
+    <Compile Remove="ProjectWork.PresentationTests\**" />
+    <Content Remove="ProjectWork.PresentationTests\**" />
+    <None Remove="ProjectWork.PresentationTests\**" />
+    <EmbeddedResource Remove="ProjectWork.PresentationTests\**" />
+	
+	<Compile Remove="ProjectWork.Domain\**" />
+    <Content Remove="ProjectWork.Domain\**" />
+    <None Remove="ProjectWork.Domain\**" />
+    <EmbeddedResource Remove="ProjectWork.Domain\**" />
+
+    <Compile Remove="ProjectWork.Application\**" />
+    <Content Remove="ProjectWork.Application\**" />
+    <None Remove="ProjectWork.Application\**" />
+    <EmbeddedResource Remove="ProjectWork.Application\**" />
+
+    <Compile Remove="ProjectWork.Infrastructure\**" />
+    <Content Remove="ProjectWork.Infrastructure\**" />
+    <None Remove="ProjectWork.Infrastructure\**" />
+    <EmbeddedResource Remove="ProjectWork.Infrastructure\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="ProjectWork.Application\ProjectWork.Application.csproj" />
+    <ProjectReference Include="ProjectWork.Infrastructure\ProjectWork.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

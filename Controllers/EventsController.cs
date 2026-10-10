@@ -1,18 +1,20 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
-using ProjectWork.DTO;
-using ProjectWork.Services;
-using ProjectWork.Models;
-using ProjectWork.Exceptions;
+using ProjectWork.Application.DTO;
+using ProjectWork.Application.Services;
+using ProjectWork.Application.Common;
+using ProjectWork.Domain.Exceptions;
 
 namespace ProjectWork.Controllers
 {
+    /// <summary>HTTP-операции создания, чтения, обновления и удаления событий.</summary>
     [ApiController]
     [Route("events")]
     public class EventsController : ControllerBase
     {
         private readonly IEventService _eventService;
 
+        /// <summary>Создать контроллер с прикладным сервисом событий.</summary>
         public EventsController(IEventService eventService)
         {
             _eventService = eventService;
@@ -30,16 +32,23 @@ namespace ProjectWork.Controllers
         /// <response code="200">Успешно возвращает страницу списка событий</response>
         /// <response code="400">Некорректные параметры пагинации</response>
         [HttpGet]
-        [ProducesResponseType(typeof(PaginatedResult<Event>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(PaginatedResult<EventInfo>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<PaginatedResult<Event>>> GetEvents(
+        public async Task<ActionResult<PaginatedResult<EventInfo>>> GetEvents(
             [FromQuery] string? title,
             [FromQuery] DateTime? from,
             [FromQuery] DateTime? to,
             [FromQuery][Range(1, int.MaxValue)] int page = 1,
             [FromQuery][Range(1, int.MaxValue)] int pageSize = 10)
         {
-            return Ok(await _eventService.GetEventsAsync(title, from, to, page, pageSize));
+            var result = await _eventService.GetEventsAsync(title, from, to, page, pageSize);
+            return Ok(new PaginatedResult<EventInfo>
+            {
+                TotalCount = result.TotalCount,
+                Page = result.Page,
+                PageSize = result.PageSize,
+                Items = result.Items.Select(EventInfo.FromEvent).ToList()
+            });
         }
 
         /// <summary>
@@ -50,16 +59,16 @@ namespace ProjectWork.Controllers
         /// <response code="200">Успешно возвращает событие с указанным ID</response>
         /// <response code="404">Событие с указанным ID не найдено</response>
         [HttpGet("{id:guid}")]
-        [ProducesResponseType(typeof(Event), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(EventInfo), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<Event>> GetEventById(Guid id)
+        public async Task<ActionResult<EventInfo>> GetEventById(Guid id)
         {
             var eventItem = await _eventService.GetEventByIdAsync(id);
 
             if (eventItem is null)
                 throw new NotFoundException($"Событие с идентификатором '{id}' не найдено.");
 
-            return Ok(eventItem);
+            return Ok(EventInfo.FromEvent(eventItem));
         }
 
         /// <summary>
