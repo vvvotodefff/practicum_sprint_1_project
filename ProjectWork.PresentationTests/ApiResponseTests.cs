@@ -14,7 +14,7 @@ using ProjectWork.Middleware;
 using ProjectWork.Application.Common;
 using ProjectWork.Application.Services;
 
-namespace ProjectWork.Tests;
+namespace ProjectWork.PresentationTests;
 
 // Удаление JSON-атрибутов из Domain не должно менять публичные ответы API.
 public sealed class ApiResponseTests : IDisposable

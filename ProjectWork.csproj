@@ -27,6 +27,10 @@
     <Content Remove="ProjectWork.IntegrationTests\**" />
     <None Remove="ProjectWork.IntegrationTests\**" />
     <EmbeddedResource Remove="ProjectWork.IntegrationTests\**" />
+    <Compile Remove="ProjectWork.PresentationTests\**" />
+    <Content Remove="ProjectWork.PresentationTests\**" />
+    <None Remove="ProjectWork.PresentationTests\**" />
+    <EmbeddedResource Remove="ProjectWork.PresentationTests\**" />
 	
 	<Compile Remove="ProjectWork.Domain\**" />
     <Content Remove="ProjectWork.Domain\**" />
